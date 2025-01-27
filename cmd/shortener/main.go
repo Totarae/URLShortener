@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -29,7 +29,7 @@ func commonHandler(w http.ResponseWriter, r *http.Request) {
 func receiveURL(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method == http.MethodPost {
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			http.Error(res, "BadRequest", http.StatusBadRequest)
 			return
