@@ -27,26 +27,28 @@ func commonHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func receiveURL(res http.ResponseWriter, req *http.Request) {
-
-	if req.Method == http.MethodPost {
-		body, err := io.ReadAll(req.Body)
-		if err != nil {
-			http.Error(res, "BadRequest", http.StatusBadRequest)
-			return
-		}
-
-		originalURL := string(body)
-		if originalURL == "" {
-			http.Error(res, "URL empty", http.StatusBadRequest)
-			return
-		}
-
-		shortURL := generateShortURL(originalURL)
-		res.WriteHeader(http.StatusCreated)
-		res.Header().Set("Content-Type", "text/plain")
-		res.Write([]byte(shortURL))
+	if req.Method != http.MethodPost {
+		http.Error(res, "Method Not Allowed", http.StatusBadRequest)
 		return
 	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(res, "BadRequest", http.StatusBadRequest)
+		return
+	}
+
+	originalURL := string(body)
+	if originalURL == "" {
+		http.Error(res, "URL empty", http.StatusBadRequest)
+		return
+	}
+
+	shortURL := generateShortURL(originalURL)
+	res.WriteHeader(http.StatusCreated)
+	res.Header().Set("Content-Type", "text/plain")
+	res.Write([]byte(shortURL))
+	return
+
 }
 
 func generateShortURL(originalURL string) string {
