@@ -47,8 +47,6 @@ func receiveURL(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusCreated)
 	res.Header().Set("Content-Type", "text/plain")
 	res.Write([]byte(shortURL))
-	return
-
 }
 
 func generateShortURL(originalURL string) string {
