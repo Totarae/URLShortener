@@ -14,7 +14,13 @@ import (
 var (
 	urlStore = make(map[string]string) // Хранилище сокращённых URL
 	mutex    = sync.RWMutex{}          // Мьютекс для безопасного доступа к хранилищу
+	baseURL  string
 )
+
+// SetBaseURL устанавливает базовый URL для сокращённых ссылок
+func SetBaseURL(url string) {
+	baseURL = strings.TrimSuffix(url, "/")
+}
 
 func ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
@@ -24,7 +30,7 @@ func ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	originalURL := string(body)
+	originalURL := strings.TrimSpace(string(body))
 	if originalURL == "" {
 		http.Error(res, "URL empty", http.StatusBadRequest)
 		return
