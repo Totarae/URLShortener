@@ -1,7 +1,9 @@
-package main
+package handlers
 
 import (
+	"context"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +17,7 @@ func TestReceiveURL(t *testing.T) {
 	req.Header.Set("Content-Type", "text/plain")
 
 	w := httptest.NewRecorder()
-	receiveURL(w, req)
+	ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -30,7 +32,7 @@ func TestReceiveURL_EmptyBody(t *testing.T) {
 	req.Header.Set("Content-Type", "text/plain")
 
 	w := httptest.NewRecorder()
-	receiveURL(w, req)
+	ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -54,7 +56,7 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	receiveURL(w, req)
+	ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -65,6 +67,11 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 }
 
 func TestResponseURL(t *testing.T) {
+	r := chi.NewRouter()
+
+	// Add the route to the router
+	r.Get("/{id}", ResponseURL)
+
 	// Добавляем тестовый URL в хранилище
 	shortID := generateShortURL("https://example.com")
 	shortPath := strings.TrimPrefix(shortID, "http://localhost:8080/")
@@ -72,8 +79,14 @@ func TestResponseURL(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/"+shortPath, nil)
 	w := httptest.NewRecorder()
 
-	responseURL(w, req)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", shortPath)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
+	// Serve the request using the Chi router
+	r.ServeHTTP(w, req)
+
+	// Check the response status code
 	resp := w.Result()
 	defer resp.Body.Close()
 
@@ -88,10 +101,20 @@ func TestResponseURL(t *testing.T) {
 }
 
 func TestResponseURL_NotFound(t *testing.T) {
+	r := chi.NewRouter()
+
+	// Add the route to the router
+	r.Get("/{id}", ResponseURL)
+
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
 	w := httptest.NewRecorder()
 
-	responseURL(w, req)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "nonexistent") // Set the ID to "nonexistent"
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	// Serve the request using the Chi router
+	r.ServeHTTP(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -105,7 +128,7 @@ func TestResponseURL_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/someid", nil)
 	w := httptest.NewRecorder()
 
-	responseURL(w, req)
+	ResponseURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
