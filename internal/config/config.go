@@ -16,14 +16,15 @@ func InitConfig() *Config {
 	cfg := &Config{}
 
 	// Определение флагов
-	flag.StringVar(&cfg.ServerAddress, "a", "localhost:8080", "адрес запуска HTTP-сервера")
-	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "базовый адрес результирующего сокращённого URL")
+	flag.StringVar(&cfg.ServerAddress, "a", "localhost:8080", "server adress")
+	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "host")
 
 	// Парсинг флагов
 	flag.Parse()
+	fmt.Printf("Инициализация конфигурации: ServerAddress=%s\n", cfg.ServerAddress)
 
 	// Логирование полученных значений флагов
-	fmt.Printf("Инициализация конфигурации: ServerAddress=%s, BaseURL=%s", cfg.ServerAddress, cfg.BaseURL)
+	fmt.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
 
 	return cfg
 }
