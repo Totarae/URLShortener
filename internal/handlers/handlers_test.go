@@ -66,15 +66,22 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 	}
 }
 
+// TestResponseURL проверяет редирект на оригинальный URL
 func TestResponseURL(t *testing.T) {
 	r := chi.NewRouter()
-
-	// Add the route to the router
 	r.Get("/{id}", ResponseURL)
 
-	// Добавляем тестовый URL в хранилище
+	// Устанавливаем baseURL (иначе generateShortURL выдаст неверный путь)
+	SetBaseURL("http://localhost:8080")
+
+	// Генерируем сокращенный URL
 	shortID := generateShortURL("https://example.com")
 	shortPath := strings.TrimPrefix(shortID, "http://localhost:8080/")
+
+	// Добавляем в хранилище вручную
+	mutex.Lock()
+	urlStore[shortPath] = "https://example.com"
+	mutex.Unlock()
 
 	req := httptest.NewRequest(http.MethodGet, "/"+shortPath, nil)
 	w := httptest.NewRecorder()
@@ -83,10 +90,8 @@ func TestResponseURL(t *testing.T) {
 	rctx.URLParams.Add("id", shortPath)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-	// Serve the request using the Chi router
 	r.ServeHTTP(w, req)
 
-	// Check the response status code
 	resp := w.Result()
 	defer resp.Body.Close()
 
