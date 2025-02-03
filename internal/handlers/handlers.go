@@ -20,7 +20,6 @@ var (
 // SetBaseURL устанавливает базовый URL для сокращённых ссылок
 func SetBaseURL(url string) {
 	baseURL = strings.TrimSuffix(url, "/")
-	fmt.Printf("Base URL: %s\n", baseURL)
 }
 
 func ReceiveURL(res http.ResponseWriter, req *http.Request) {
