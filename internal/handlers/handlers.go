@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/go-chi/chi/v5"
-	_ "github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"strings"
