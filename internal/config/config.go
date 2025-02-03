@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
 )
 
 // Config хранит конфигурацию сервера
@@ -21,6 +22,15 @@ func InitConfig() *Config {
 
 	// Парсинг флагов
 	flag.Parse()
+
+	// Проверка переменных окружения с приоритетом выше флагов
+	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
+		cfg.ServerAddress = envServerAddress
+	}
+	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+		cfg.BaseURL = envBaseURL
+	}
+
 	fmt.Printf("Инициализация конфигурации: ServerAddress=%s\n", cfg.ServerAddress)
 
 	// Логирование полученных значений флагов
