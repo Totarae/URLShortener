@@ -22,6 +22,9 @@ func InitConfig() *Config {
 	// Парсинг флагов
 	flag.Parse()
 
+	// Логирование полученных значений флагов
+	fmt.Printf("Инициализация конфигурации: ServerAddress=%s, BaseURL=%s", cfg.ServerAddress, cfg.BaseURL)
+
 	return cfg
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"strings"
@@ -20,6 +21,7 @@ var (
 // SetBaseURL устанавливает базовый URL для сокращённых ссылок
 func SetBaseURL(url string) {
 	baseURL = strings.TrimSuffix(url, "/")
+	fmt.Printf("Base URL: %s\n", baseURL)
 }
 
 func ReceiveURL(res http.ResponseWriter, req *http.Request) {
@@ -56,7 +58,7 @@ func generateShortURL(originalURL string) string {
 	urlStore[hashString] = originalURL
 	mutex.Unlock()
 
-	return "http://localhost:8080/" + hashString
+	return baseURL + "/" + hashString
 }
 
 func ResponseURL(res http.ResponseWriter, req *http.Request) {
