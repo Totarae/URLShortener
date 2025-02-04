@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
@@ -11,13 +12,20 @@ import (
 	"testing"
 )
 
+func setupHandler() *Handler {
+	store := util.NewURLStore()
+	baseURL := "http://localhost:8080"
+	return NewHandler(store, baseURL)
+}
+
 func TestReceiveURL(t *testing.T) {
+	h := setupHandler()
 	reqBody := "https://example.com"
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "text/plain")
 
 	w := httptest.NewRecorder()
-	ReceiveURL(w, req)
+	h.ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -28,11 +36,13 @@ func TestReceiveURL(t *testing.T) {
 }
 
 func TestReceiveURL_EmptyBody(t *testing.T) {
+	h := setupHandler()
+
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(""))
 	req.Header.Set("Content-Type", "text/plain")
 
 	w := httptest.NewRecorder()
-	ReceiveURL(w, req)
+	h.ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -43,6 +53,8 @@ func TestReceiveURL_EmptyBody(t *testing.T) {
 }
 
 func TestReceiveURL_WrongMethod(t *testing.T) {
+	h := setupHandler()
+
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	// Print request details
@@ -56,7 +68,7 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	ReceiveURL(w, req)
+	h.ReceiveURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -68,20 +80,14 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 
 // TestResponseURL проверяет редирект на оригинальный URL
 func TestResponseURL(t *testing.T) {
+	h := setupHandler()
 	r := chi.NewRouter()
-	r.Get("/{id}", ResponseURL)
+	r.Get("/{id}", h.ResponseURL)
 
-	// Устанавливаем baseURL (иначе generateShortURL выдаст неверный путь)
-	SetBaseURL("http://localhost:8080")
+	shortURL := util.GenerateShortURL("https://example.com", h.baseURL, h.store)
+	shortPath := strings.TrimPrefix(shortURL, h.baseURL+"/")
 
-	// Генерируем сокращенный URL
-	shortID := generateShortURL("https://example.com")
-	shortPath := strings.TrimPrefix(shortID, "http://localhost:8080/")
-
-	// Добавляем в хранилище вручную
-	mutex.Lock()
-	urlStore[shortPath] = "https://example.com"
-	mutex.Unlock()
+	h.store.Save(shortPath, "https://example.com")
 
 	req := httptest.NewRequest(http.MethodGet, "/"+shortPath, nil)
 	w := httptest.NewRecorder()
@@ -106,10 +112,11 @@ func TestResponseURL(t *testing.T) {
 }
 
 func TestResponseURL_NotFound(t *testing.T) {
+	h := setupHandler()
 	r := chi.NewRouter()
 
 	// Add the route to the router
-	r.Get("/{id}", ResponseURL)
+	r.Get("/{id}", h.ResponseURL)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -130,10 +137,12 @@ func TestResponseURL_NotFound(t *testing.T) {
 }
 
 func TestResponseURL_WrongMethod(t *testing.T) {
+	h := setupHandler()
+
 	req := httptest.NewRequest(http.MethodPost, "/someid", nil)
 	w := httptest.NewRecorder()
 
-	ResponseURL(w, req)
+	h.ResponseURL(w, req)
 
 	resp := w.Result()
 	defer resp.Body.Close()

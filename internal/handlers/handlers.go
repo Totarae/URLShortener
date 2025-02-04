@@ -25,11 +25,6 @@ func NewHandler(store util.Storage, baseURL string) *Handler {
 	}
 }
 
-// SetBaseURL устанавливает базовый URL для сокращённых ссылок
-/*func SetBaseURL(url string) {
-	baseURL = strings.TrimSuffix(url, "/")
-}*/
-
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
