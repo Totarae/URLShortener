@@ -3,7 +3,8 @@ package config
 import (
 	"flag"
 	"fmt"
-	"os"
+	"github.com/spf13/viper"
+	"log"
 )
 
 // Config хранит конфигурацию сервера
@@ -12,29 +13,40 @@ type Config struct {
 	BaseURL       string
 }
 
-// InitConfig инициализирует конфигурацию на основе аргументов командной строки
-func InitConfig() *Config {
-	cfg := &Config{}
+// NewConfig инициализирует конфигурацию на основе аргументов командной строки
+func NewConfig() *Config {
 
-	// Определение флагов
-	flag.StringVar(&cfg.ServerAddress, "a", "localhost:8080", "server adress")
-	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "host")
+	viper.SetDefault("SERVER_ADDRESS", "localhost:8080") // Значения по умолчанию
+	viper.SetDefault("BASE_URL", "http://localhost:8080")
 
-	// Парсинг флагов
+	viper.AutomaticEnv()
+
+	// Читаем .env, если есть (не переопределяет переменные окружения!)
+	viper.SetConfigFile(".env")
+	_ = viper.ReadInConfig() // Ошибку игнорируем, если файла нет
+
+	// Определяем флаги, но НЕ задаем в них значения по умолчанию
+	serverAddress := flag.String("a", "", "server address")
+	baseURL := flag.String("b", "", "base URL")
+
 	flag.Parse()
 
-	// Проверка переменных окружения с приоритетом выше флагов
-	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
-		cfg.ServerAddress = envServerAddress
-	}
-	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
-		cfg.BaseURL = envBaseURL
+	// Если переменные окружения заданы — они имеют высший приоритет
+	cfg := &Config{
+		ServerAddress: viper.GetString("SERVER_ADDRESS"),
+		BaseURL:       viper.GetString("BASE_URL"),
 	}
 
-	fmt.Printf("Инициализация конфигурации: ServerAddress=%s\n", cfg.ServerAddress)
+	// Если флаг передан, но переменной окружения нет — используем флаг
+	if *serverAddress != "" {
+		cfg.ServerAddress = *serverAddress
+	}
+	if *baseURL != "" {
+		cfg.BaseURL = *baseURL
+	}
 
-	// Логирование полученных значений флагов
-	fmt.Printf("Инициализация конфигурации: BaseURL=%s\n", cfg.BaseURL)
+	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
+	log.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
 
 	return cfg
 }

@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/handlers"
-	"github.com/go-chi/chi/v5"
+	"github.com/Totarae/URLShortener/internal/router"
+	"github.com/Totarae/URLShortener/internal/util"
 	"net/http"
 )
 
 func main() {
 
 	// Инициализация конфигурации
-	cfg := config.InitConfig()
+	cfg := config.NewConfig()
 
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
@@ -19,13 +20,13 @@ func main() {
 		return
 	}
 
+	store := util.NewURLStore()
+
 	// Передача базового URL в обработчики
-	handlers.SetBaseURL(cfg.BaseURL)
+	handler := handlers.NewHandler(store, cfg.BaseURL)
 
-	r := chi.NewRouter()
-	r.Post("/", handlers.ReceiveURL)
-	r.Get("/{id}", handlers.ResponseURL)
-
+	r := router.NewRouter(handler)
+	
 	fmt.Printf("Сервер запущен на %s\n", cfg.ServerAddress)
 	if err := http.ListenAndServe(cfg.ServerAddress, r); err != nil {
 		fmt.Printf("Ошибка при запуске сервера: %v\n", err)

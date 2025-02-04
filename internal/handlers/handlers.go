@@ -1,28 +1,36 @@
 package handlers
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
-	"sync"
 )
 
-var (
-	urlStore = make(map[string]string) // Хранилище сокращённых URL
-	mutex    = sync.RWMutex{}          // Мьютекс для безопасного доступа к хранилищу
-	baseURL  string
-)
-
-// SetBaseURL устанавливает базовый URL для сокращённых ссылок
-func SetBaseURL(url string) {
-	baseURL = strings.TrimSuffix(url, "/")
+type Handler struct {
+	store   util.Storage // Use the new URLStore for thread safety
+	baseURL string
 }
 
-func ReceiveURL(res http.ResponseWriter, req *http.Request) {
+var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
+
+func NewHandler(store util.Storage, baseURL string) *Handler {
+	return &Handler{
+		store:   store,
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+	}
+}
+
+// SetBaseURL устанавливает базовый URL для сокращённых ссылок
+/*func SetBaseURL(url string) {
+	baseURL = strings.TrimSuffix(url, "/")
+}*/
+
+func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -35,31 +43,20 @@ func ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL empty", http.StatusBadRequest)
 		return
 	}
+	// Проверка корректности URL
+	parsedURL, err := url.ParseRequestURI(originalURL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		return
+	}
 
-	shortURL := generateShortURL(originalURL)
-	res.WriteHeader(http.StatusCreated)
+	shortURL := util.GenerateShortURL(originalURL, h.baseURL, h.store)
 	res.Header().Set("Content-Type", "text/plain")
+	res.WriteHeader(http.StatusCreated)
 	res.Write([]byte(shortURL))
 }
 
-func generateShortURL(originalURL string) string {
-
-	hash := sha256.Sum256([]byte(originalURL))
-	fmt.Printf("SHA256 hash: %x\n", hash)
-	hashString := base64.RawURLEncoding.EncodeToString(hash[:16])
-	hashString = strings.ToLower(hashString)
-	// первые 16 байт, без паддинга, url-safe
-	fmt.Println("SHA256 (Base64):", hashString)
-
-	// Сохраняем в хранилище
-	mutex.Lock()
-	urlStore[hashString] = originalURL
-	mutex.Unlock()
-
-	return baseURL + "/" + hashString
-}
-
-func ResponseURL(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
 	if id == "" {
@@ -67,26 +64,15 @@ func ResponseURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	/*if req.Method != http.MethodGet {
-		http.Error(res, "Method Not Allowed", http.StatusBadRequest)
+	// Проверяем ID на корректность
+	if !validIDPattern.MatchString(id) {
+		http.Error(res, "Bad Request: Invalid ID format", http.StatusBadRequest)
 		return
-	}*/
-
-	// Получаем id из пути Убираем первый `/`
-
-	// Проверяем, что путь содержит идентификатор
-	/*id := strings.TrimPrefix(req.URL.Path, "/")
-	if id == "" {
-		http.Error(res, "Bad Request: Missing ID in URL", http.StatusBadRequest)
-		return
-	}*/
+	}
 
 	fmt.Println("Incoming ID : ", id)
 	// Ищем оригинальный URL в хранилище
-	//originalURL, exists := urlStore[id]
-	mutex.RLock()
-	originalURL, exists := urlStore[id]
-	mutex.RUnlock()
+	originalURL, exists := h.store.Get(id)
 	if !exists {
 		http.NotFound(res, req)
 		return
