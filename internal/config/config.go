@@ -9,8 +9,9 @@ import (
 
 // Config хранит конфигурацию сервера
 type Config struct {
-	ServerAddress string
-	BaseURL       string
+	ServerAddress   string
+	BaseURL         string
+	FileStoragePath string
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -18,6 +19,7 @@ func NewConfig() *Config {
 
 	viper.SetDefault("SERVER_ADDRESS", "localhost:8080") // Значения по умолчанию
 	viper.SetDefault("BASE_URL", "http://localhost:8080")
+	viper.SetDefault("FILE_STORAGE_PATH", "data.json")
 
 	viper.AutomaticEnv()
 
@@ -28,13 +30,15 @@ func NewConfig() *Config {
 	// Определяем флаги, но НЕ задаем в них значения по умолчанию
 	serverAddress := flag.String("a", "", "server address")
 	baseURL := flag.String("b", "", "base URL")
+	fileStoragePath := flag.String("f", "", "file storage path (JSON file)")
 
 	flag.Parse()
 
 	// Если переменные окружения заданы — они имеют высший приоритет
 	cfg := &Config{
-		ServerAddress: viper.GetString("SERVER_ADDRESS"),
-		BaseURL:       viper.GetString("BASE_URL"),
+		ServerAddress:   viper.GetString("SERVER_ADDRESS"),
+		BaseURL:         viper.GetString("BASE_URL"),
+		FileStoragePath: viper.GetString("FILE_STORAGE_PATH"),
 	}
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -44,9 +48,13 @@ func NewConfig() *Config {
 	if *baseURL != "" {
 		cfg.BaseURL = *baseURL
 	}
+	if *fileStoragePath != "" {
+		cfg.FileStoragePath = *fileStoragePath
+	}
 
 	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
 	log.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
+	log.Printf("Инициализация конфигурации: FileStoragePath=%s", cfg.FileStoragePath)
 
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
@@ -63,6 +71,9 @@ func (cfg *Config) Validate() error {
 	}
 	if cfg.BaseURL == "" {
 		return fmt.Errorf("базовый URL не может быть пустым")
+	}
+	if cfg.FileStoragePath == "" {
+		return fmt.Errorf("путь к файлу хранилища не может быть пустым")
 	}
 	return nil
 }

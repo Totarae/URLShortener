@@ -16,7 +16,7 @@ func main() {
 	// Инициализация конфигурации
 	cfg := config.NewConfig()
 
-	store := util.NewURLStore()
+	store := util.NewURLStore(cfg.FileStoragePath)
 
 	// Передача базового URL в обработчики
 	handler := handlers.NewHandler(store, cfg.BaseURL)

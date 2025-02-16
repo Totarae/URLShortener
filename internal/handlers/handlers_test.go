@@ -13,7 +13,7 @@ import (
 )
 
 func setupHandler() *Handler {
-	store := util.NewURLStore()
+	store := util.NewURLStore("test_data.json")
 	baseURL := "http://localhost:8080"
 	return NewHandler(store, baseURL)
 }
