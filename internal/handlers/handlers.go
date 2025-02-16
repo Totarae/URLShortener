@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/storage"
 	"github.com/Totarae/URLShortener/internal/util"
@@ -15,6 +16,14 @@ import (
 type Handler struct {
 	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
+}
+
+type ShortenRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenResponse struct {
+	Result string `json:"result"`
 }
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
@@ -77,4 +86,32 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 	// Устанавливаем заголовок Location и код 307
 	res.Header().Set("Location", originalURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
+	var request ShortenRequest
+	decoder := json.NewDecoder(req.Body)
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(res, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	originalURL := strings.TrimSpace(request.URL)
+	if originalURL == "" {
+		http.Error(res, "URL empty", http.StatusBadRequest)
+		return
+	}
+
+	parsedURL, err := url.ParseRequestURI(originalURL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	shortURL := util.GenerateShortURL(originalURL, h.baseURL, h.store)
+
+	response := ShortenResponse{Result: shortURL}
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
+	json.NewEncoder(res).Encode(response)
 }

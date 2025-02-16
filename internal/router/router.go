@@ -12,6 +12,7 @@ func NewRouter(handler *handlers.Handler, logger *zap.Logger) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.LoggingMiddleware(logger))
 	r.Post("/", handler.ReceiveURL)
+	r.Post("/api/shorten", handler.ReceiveShorten)
 	r.Get("/{id}", handler.ResponseURL)
 	return r
 }
