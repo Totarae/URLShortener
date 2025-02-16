@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/storage"
 	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -12,13 +13,13 @@ import (
 )
 
 type Handler struct {
-	store   util.Storage // Use the new URLStore for thread safety
+	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
 }
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store util.Storage, baseURL string) *Handler {
+func NewHandler(store storage.Storage, baseURL string) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),

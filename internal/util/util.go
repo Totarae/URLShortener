@@ -3,6 +3,7 @@ package util
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"github.com/Totarae/URLShortener/internal/storage"
 	"strings"
 	"sync"
 )
@@ -11,11 +12,6 @@ import (
 type URLStore struct {
 	data  map[string]string
 	mutex sync.RWMutex
-}
-
-type Storage interface {
-	Save(short, original string)
-	Get(short string) (string, bool)
 }
 
 // NewURLStore initializes a new URLStore
@@ -41,7 +37,7 @@ func (s *URLStore) Get(short string) (string, bool) {
 }
 
 // GenerateShortURL creates a shortened URL
-func GenerateShortURL(originalURL string, baseURL string, store Storage) string {
+func GenerateShortURL(originalURL string, baseURL string, store storage.Storage) string {
 	hash := sha256.Sum256([]byte(originalURL))
 	hashString := base64.RawURLEncoding.EncodeToString(hash[:16])
 	hashString = strings.ToLower(hashString) // Ensure lowercase for consistency
