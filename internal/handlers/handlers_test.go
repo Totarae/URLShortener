@@ -151,3 +151,37 @@ func TestResponseURL_WrongMethod(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
 }
+
+func TestReceiveShorten(t *testing.T) {
+	h := setupHandler()
+	reqBody := `{"url":"https://example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	h.ReceiveShorten(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+}
+
+func TestReceiveShorten_InvalidJSON(t *testing.T) {
+	h := setupHandler()
+	reqBody := `{"invalid":"data"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	h.ReceiveShorten(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}

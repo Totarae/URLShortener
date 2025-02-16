@@ -48,6 +48,11 @@ func NewConfig() *Config {
 	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
 	log.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
 
+	// Проверка корректности конфигурации
+	if err := cfg.Validate(); err != nil {
+		fmt.Printf("Ошибка конфигурации: %v\n", err)
+	}
+
 	return cfg
 }
 
