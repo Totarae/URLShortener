@@ -12,6 +12,7 @@ type Config struct {
 	ServerAddress   string
 	BaseURL         string
 	FileStoragePath string
+	DatabaseDSN     string
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -20,6 +21,7 @@ func NewConfig() *Config {
 	viper.SetDefault("SERVER_ADDRESS", "localhost:8080") // Значения по умолчанию
 	viper.SetDefault("BASE_URL", "http://localhost:8080")
 	viper.SetDefault("FILE_STORAGE_PATH", "data.json")
+	viper.SetDefault("DATABASE_DSN", "")
 
 	viper.AutomaticEnv()
 
@@ -31,6 +33,7 @@ func NewConfig() *Config {
 	serverAddress := flag.String("a", "", "server address")
 	baseURL := flag.String("b", "", "base URL")
 	fileStoragePath := flag.String("f", "", "file storage path (JSON file)")
+	databaseDSN := flag.String("d", "", "PostgreSQL DSN")
 
 	flag.Parse()
 
@@ -39,6 +42,7 @@ func NewConfig() *Config {
 		ServerAddress:   viper.GetString("SERVER_ADDRESS"),
 		BaseURL:         viper.GetString("BASE_URL"),
 		FileStoragePath: viper.GetString("FILE_STORAGE_PATH"),
+		DatabaseDSN:     viper.GetString("DATABASE_DSN"),
 	}
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -51,10 +55,14 @@ func NewConfig() *Config {
 	if *fileStoragePath != "" {
 		cfg.FileStoragePath = *fileStoragePath
 	}
+	if *databaseDSN != "" {
+		cfg.DatabaseDSN = *databaseDSN
+	}
 
 	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
 	log.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
 	log.Printf("Инициализация конфигурации: FileStoragePath=%s", cfg.FileStoragePath)
+	log.Printf("Инициализация конфигурации: DatabaseDSN=%s", cfg.DatabaseDSN)
 
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
@@ -74,6 +82,9 @@ func (cfg *Config) Validate() error {
 	}
 	if cfg.FileStoragePath == "" {
 		return fmt.Errorf("путь к файлу хранилища не может быть пустым")
+	}
+	if cfg.DatabaseDSN == "" {
+		return fmt.Errorf("адрес подключения к БД не может быть пустым")
 	}
 	return nil
 }
