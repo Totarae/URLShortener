@@ -101,6 +101,7 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Empty request body", http.StatusBadRequest)
 		return
 	}
+
 	decoder := json.NewDecoder(req.Body)
 	if err := decoder.Decode(&request); err != nil {
 		http.Error(res, "Invalid JSON", http.StatusBadRequest)

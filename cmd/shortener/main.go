@@ -1,17 +1,19 @@
 package main
 
 import (
+	"net/http"
+	"os"
+
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/database"
 	"github.com/Totarae/URLShortener/internal/handlers"
 	"github.com/Totarae/URLShortener/internal/router"
 	"github.com/Totarae/URLShortener/internal/util"
 	"go.uber.org/zap"
-	"net/http"
-	"os"
 )
 
 func main() {
+
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic("Не удалось инициализировать логгер")
