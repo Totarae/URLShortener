@@ -69,7 +69,7 @@ func runPgMigrations(cfg *config.Config) error {
 	}
 
 	if cfg.DatabaseDSN == "" {
-		return errors.New("No cfg.PgURL provided")
+		return errors.New("no cfg.PgURL provided")
 	}
 
 	m, err := migrate.New(
@@ -80,7 +80,7 @@ func runPgMigrations(cfg *config.Config) error {
 		return fmt.Errorf("ошибка при создании миграции: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("ошибка при применении миграции: %w", err)
 	}
 
