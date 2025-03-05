@@ -17,5 +17,6 @@ func NewRouter(handler *handlers.Handler, logger *zap.Logger) *chi.Mux {
 	r.Post("/", handler.ReceiveURL)
 	r.Post("/api/shorten", handler.ReceiveShorten)
 	r.Get("/{id}", handler.ResponseURL)
+	r.Get("/ping", handler.PingHandler) // Проверка соединения с БД
 	return r
 }
