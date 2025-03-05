@@ -3,8 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/mocks"
 	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,14 +16,26 @@ import (
 	"testing"
 )
 
-func setupHandler() *Handler {
-	store := util.NewURLStore("test_data.json")
+func setupMockHandler(t *testing.T, mockDB *mocks.MockDBInterface, mockStore *mocks.MockStorage) *Handler {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	baseURL := "http://localhost:8080"
-	return NewHandler(store, baseURL)
+
+	return NewHandler(mockStore, baseURL, mockDB, logger)
 }
 
 func TestReceiveURL(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	mockStore.EXPECT().Save(gomock.Any(), gomock.Any()).Return().Times(1)
+
+	h := setupMockHandler(t, mockDB, mockStore)
+
 	reqBody := "https://example.com"
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "text/plain")
@@ -30,13 +46,21 @@ func TestReceiveURL(t *testing.T) {
 	resp := w.Result()
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	body, _ := io.ReadAll(resp.Body)
+	assert.NotEmpty(t, body, "Ответ должен содержать короткий URL")
 }
 
 func TestReceiveURL_EmptyBody(t *testing.T) {
-	h := setupHandler()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(""))
 	req.Header.Set("Content-Type", "text/plain")
@@ -53,7 +77,13 @@ func TestReceiveURL_EmptyBody(t *testing.T) {
 }
 
 func TestReceiveURL_WrongMethod(t *testing.T) {
-	h := setupHandler()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+	h := setupMockHandler(t, mockDB, mockStore)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -80,7 +110,16 @@ func TestReceiveURL_WrongMethod(t *testing.T) {
 
 // TestResponseURL проверяет редирект на оригинальный URL
 func TestResponseURL(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	mockStore.EXPECT().Save(gomock.Any(), gomock.Any()).Return().Times(2)
+	mockStore.EXPECT().Get(gomock.Any()).Return("https://example.com", true).Times(1)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 	r := chi.NewRouter()
 	r.Get("/{id}", h.ResponseURL)
 
@@ -112,7 +151,15 @@ func TestResponseURL(t *testing.T) {
 }
 
 func TestResponseURL_NotFound(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+	// Мокаем `Get`, который должен вернуть "", false (означает, что URL не найден)
+	mockStore.EXPECT().Get(gomock.Any()).Return("", false).Times(1)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 	r := chi.NewRouter()
 
 	// Add the route to the router
@@ -137,7 +184,13 @@ func TestResponseURL_NotFound(t *testing.T) {
 }
 
 func TestResponseURL_WrongMethod(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 
 	req := httptest.NewRequest(http.MethodPost, "/someid", nil)
 	w := httptest.NewRecorder()
@@ -153,7 +206,15 @@ func TestResponseURL_WrongMethod(t *testing.T) {
 }
 
 func TestReceiveShorten(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	mockStore.EXPECT().Save(gomock.Any(), gomock.Any()).Return().Times(1)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 	reqBody := `{"url":"https://example.com"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -170,7 +231,13 @@ func TestReceiveShorten(t *testing.T) {
 }
 
 func TestReceiveShorten_InvalidJSON(t *testing.T) {
-	h := setupHandler()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := mocks.NewMockDBInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+
+	h := setupMockHandler(t, mockDB, mockStore)
 	reqBody := `{"invalid":"data"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")

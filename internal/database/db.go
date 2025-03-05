@@ -9,6 +9,11 @@ import (
 	"go.uber.org/zap"
 )
 
+type DBInterface interface {
+	Ping(ctx context.Context) error
+	Close()
+}
+
 // DB представляет подключение к БД
 type DB struct {
 	Pool   *pgxpool.Pool

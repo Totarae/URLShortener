@@ -18,7 +18,7 @@ import (
 type Handler struct {
 	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
-	DB      *database.DB
+	DB      database.DBInterface
 	Logger  *zap.Logger
 }
 
@@ -32,7 +32,7 @@ type ShortenResponse struct {
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store storage.Storage, baseURL string, db *database.DB, logger *zap.Logger) *Handler {
+func NewHandler(store storage.Storage, baseURL string, db database.DBInterface, logger *zap.Logger) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
