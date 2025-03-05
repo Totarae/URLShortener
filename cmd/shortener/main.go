@@ -13,7 +13,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"go.uber.org/zap"
 	"net/http"
-	"os"
 )
 
 func main() {
@@ -27,24 +26,21 @@ func main() {
 	// Инициализация конфигурации
 	cfg := config.NewConfig()
 
-	// Устанавливаем DATABASE_DSN
-	if cfg.DatabaseDSN == "" {
-		logger.Fatal("DATABASE_DSN is not set")
-	}
+	var db *database.DB
 
-	os.Setenv("DATABASE_DSN", cfg.DatabaseDSN)
+	if cfg.Mode == "database" {
+		db, err := database.NewDB(logger)
+		if err != nil {
+			logger.Fatal("Ошибка подключения к базе данных", zap.Error(err))
+		} else {
+			logger.Info("DSN: ", zap.String("DB", cfg.DatabaseDSN))
+		}
+		defer db.Close()
 
-	db, err := database.NewDB(logger)
-	if err != nil {
-		logger.Fatal("Ошибка подключения к базе данных", zap.Error(err))
-	} else {
-		logger.Info("DSN: ", zap.String("DB", cfg.DatabaseDSN))
-	}
-	defer db.Close()
-
-	// run Postgres migrations
-	if err := runPgMigrations(cfg); err != nil {
-		logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
+		// run Postgres migrations
+		if err := runPgMigrations(cfg); err != nil {
+			logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
+		}
 	}
 
 	store := util.NewURLStore(cfg.FileStoragePath)

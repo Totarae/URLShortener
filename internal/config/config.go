@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"log"
+	"os"
 )
 
 // Config хранит конфигурацию сервера
@@ -14,6 +15,7 @@ type Config struct {
 	FileStoragePath  string
 	DatabaseDSN      string
 	PgMigrationsPath string
+	Mode             string
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -60,6 +62,16 @@ func NewConfig() *Config {
 	}
 	if *databaseDSN != "" {
 		cfg.DatabaseDSN = *databaseDSN
+		os.Setenv("DATABASE_DSN", cfg.DatabaseDSN)
+	}
+
+	// Определяем режим работы
+	if cfg.DatabaseDSN != "" {
+		cfg.Mode = "database"
+	} else if cfg.FileStoragePath != "" {
+		cfg.Mode = "file"
+	} else {
+		cfg.Mode = "in-memory"
 	}
 
 	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
@@ -67,6 +79,7 @@ func NewConfig() *Config {
 	log.Printf("Инициализация конфигурации: FileStoragePath=%s", cfg.FileStoragePath)
 	log.Printf("Инициализация конфигурации: DatabaseDSN=%s", cfg.DatabaseDSN)
 	log.Printf("Инициализация конфигурации: PgMigrationsPath=%s", cfg.PgMigrationsPath)
+	log.Printf("Инициализация конфигурации: Mode=%s", cfg.Mode)
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
 		fmt.Printf("Ошибка конфигурации: %v\n", err)
@@ -86,7 +99,7 @@ func (cfg *Config) Validate() error {
 	if cfg.FileStoragePath == "" {
 		return fmt.Errorf("путь к файлу хранилища не может быть пустым")
 	}
-	if cfg.DatabaseDSN == "" {
+	if cfg.DatabaseDSN == "" || cfg.PgMigrationsPath == "" {
 		return fmt.Errorf("адрес подключения к БД не может быть пустым")
 	}
 	return nil
