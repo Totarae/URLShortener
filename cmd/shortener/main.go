@@ -1,15 +1,19 @@
 package main
 
 import (
-	"net/http"
-	"os"
-
+	"errors"
+	"fmt"
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/database"
 	"github.com/Totarae/URLShortener/internal/handlers"
 	"github.com/Totarae/URLShortener/internal/router"
 	"github.com/Totarae/URLShortener/internal/util"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"go.uber.org/zap"
+	"net/http"
+	"os"
 )
 
 func main() {
@@ -27,6 +31,7 @@ func main() {
 	if cfg.DatabaseDSN == "" {
 		logger.Fatal("DATABASE_DSN is not set")
 	}
+
 	os.Setenv("DATABASE_DSN", cfg.DatabaseDSN)
 
 	db, err := database.NewDB(logger)
@@ -36,7 +41,11 @@ func main() {
 		logger.Info("DSN: ", zap.String("DB", cfg.DatabaseDSN))
 	}
 	defer db.Close()
-	logger.Info("Подключение к БД установлено", zap.String("DSN", cfg.DatabaseDSN))
+
+	// run Postgres migrations
+	if err := runPgMigrations(cfg); err != nil {
+		logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
+	}
 
 	store := util.NewURLStore(cfg.FileStoragePath)
 
@@ -50,4 +59,30 @@ func main() {
 		logger.Fatal("Ошибка при запуске сервера: ", zap.Error(err))
 	}
 
+}
+
+// runPgMigrations runs Postgres migrations
+func runPgMigrations(cfg *config.Config) error {
+
+	if cfg.PgMigrationsPath == "" {
+		return nil
+	}
+
+	if cfg.DatabaseDSN == "" {
+		return errors.New("No cfg.PgURL provided")
+	}
+
+	m, err := migrate.New(
+		"file://"+cfg.PgMigrationsPath,
+		cfg.DatabaseDSN,
+	)
+	if err != nil {
+		return fmt.Errorf("ошибка при создании миграции: %w", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("ошибка при применении миграции: %w", err)
+	}
+
+	return nil
 }

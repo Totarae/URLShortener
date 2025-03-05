@@ -9,10 +9,11 @@ import (
 
 // Config хранит конфигурацию сервера
 type Config struct {
-	ServerAddress   string
-	BaseURL         string
-	FileStoragePath string
-	DatabaseDSN     string
+	ServerAddress    string
+	BaseURL          string
+	FileStoragePath  string
+	DatabaseDSN      string
+	PgMigrationsPath string
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -22,6 +23,7 @@ func NewConfig() *Config {
 	viper.SetDefault("BASE_URL", "http://localhost:8080")
 	viper.SetDefault("FILE_STORAGE_PATH", "data.json")
 	viper.SetDefault("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+	viper.SetDefault("PG_MIGRATIONS_PATH", "internal/migrations")
 
 	viper.AutomaticEnv()
 
@@ -39,10 +41,11 @@ func NewConfig() *Config {
 
 	// Если переменные окружения заданы — они имеют высший приоритет
 	cfg := &Config{
-		ServerAddress:   viper.GetString("SERVER_ADDRESS"),
-		BaseURL:         viper.GetString("BASE_URL"),
-		FileStoragePath: viper.GetString("FILE_STORAGE_PATH"),
-		DatabaseDSN:     viper.GetString("DATABASE_DSN"),
+		ServerAddress:    viper.GetString("SERVER_ADDRESS"),
+		BaseURL:          viper.GetString("BASE_URL"),
+		FileStoragePath:  viper.GetString("FILE_STORAGE_PATH"),
+		DatabaseDSN:      viper.GetString("DATABASE_DSN"),
+		PgMigrationsPath: viper.GetString("PG_MIGRATIONS_PATH"),
 	}
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -63,7 +66,7 @@ func NewConfig() *Config {
 	log.Printf("Инициализация конфигурации: BaseURL=%s", cfg.BaseURL)
 	log.Printf("Инициализация конфигурации: FileStoragePath=%s", cfg.FileStoragePath)
 	log.Printf("Инициализация конфигурации: DatabaseDSN=%s", cfg.DatabaseDSN)
-
+	log.Printf("Инициализация конфигурации: PgMigrationsPath=%s", cfg.PgMigrationsPath)
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
 		fmt.Printf("Ошибка конфигурации: %v\n", err)
