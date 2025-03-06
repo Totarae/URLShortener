@@ -129,6 +129,9 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
+	if h.DB == nil {
+		h.Logger.Error("DB interface is null")
+	}
 	if err := h.DB.Ping(req.Context()); err != nil {
 		h.Logger.Error("Database ping failed", zap.Error(err))
 		http.Error(res, "Internal Server Error", http.StatusInternalServerError)

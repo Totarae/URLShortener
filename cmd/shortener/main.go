@@ -13,6 +13,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"go.uber.org/zap"
 	"net/http"
+	"os"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 	var db *database.DB
 
 	if cfg.Mode == "database" {
-		db, err := database.NewDB(logger)
+		db, err = database.NewDB(logger)
 		if err != nil {
 			logger.Fatal("Ошибка подключения к базе данных", zap.Error(err))
 		} else {
@@ -41,9 +42,17 @@ func main() {
 		if err := runPgMigrations(cfg); err != nil {
 			logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
 		}
+		if db == nil {
+			logger.Error("DB is null 2222")
+		}
 	}
 
 	store := util.NewURLStore(cfg.FileStoragePath)
+
+	if db == nil {
+		logger.Error("DB is null")
+		logger.Info("DB config", zap.String("Global", os.Getenv("DATABASE_DSN")))
+	}
 
 	// Передача базового URL в обработчики
 	handler := handlers.NewHandler(store, cfg.BaseURL, db, logger)
