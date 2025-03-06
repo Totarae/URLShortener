@@ -24,7 +24,7 @@ func NewConfig() *Config {
 	viper.SetDefault("SERVER_ADDRESS", "localhost:8080") // Значения по умолчанию
 	viper.SetDefault("BASE_URL", "http://localhost:8080")
 	viper.SetDefault("FILE_STORAGE_PATH", "data.json")
-	viper.SetDefault("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+	viper.SetDefault("DATABASE_DSN", "")
 	viper.SetDefault("PG_MIGRATIONS_PATH", "internal/migrations")
 
 	viper.AutomaticEnv()
