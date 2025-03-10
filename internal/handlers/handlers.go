@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/model"
@@ -52,31 +51,6 @@ type gzipResponseWriter struct {
 
 func (w gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
-}
-
-// gzipMiddleware для автоматического разархивирования входящих данных
-func decompressRequestBody(req *http.Request) (io.ReadCloser, error) {
-	if req.Header.Get("Content-Encoding") == "gzip" {
-		gzipReader, err := gzip.NewReader(req.Body)
-		if err != nil {
-			return nil, err
-		}
-		return gzipReader, nil
-	}
-	return req.Body, nil
-}
-
-// gzipMiddleware для сжатия ответа
-func compressResponse(res http.ResponseWriter, req *http.Request) (*gzip.Writer, bool) {
-	if !strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
-		return nil, false
-	}
-
-	res.Header().Set("Content-Encoding", "gzip")
-	res.Header().Set("Vary", "Accept-Encoding")
-
-	gzipWriter := gzip.NewWriter(res)
-	return gzipWriter, true
 }
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
@@ -278,15 +252,20 @@ func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request) {
 
 	// Разархивируем тело запроса, если оно в gzip
-	body, err := decompressRequestBody(req)
+	/*body, err := decompressRequestBody(req)
 	if err != nil {
 		http.Error(res, "Failed to decompress request", http.StatusBadRequest)
 		return
 	}
-	defer body.Close()
+	defer body.Close()*/
+
+	if req.Body == nil {
+		http.Error(res, "Empty request body", http.StatusBadRequest)
+		return
+	}
 
 	var batchRequest []BatchShortenRequest
-	decoder := json.NewDecoder(body)
+	decoder := json.NewDecoder(req.Body)
 	if err := decoder.Decode(&batchRequest); err != nil {
 		http.Error(res, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -346,11 +325,11 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	}
 
 	// Проверяем, поддерживает ли клиент gzip, и если да, сжимаем ответ
-	gzipWriter, useGzip := compressResponse(res, req)
+	/*gzipWriter, useGzip := compressResponse(res, req)
 	if useGzip {
 		defer gzipWriter.Close()
 		res = gzipResponseWriter{Writer: gzipWriter, ResponseWriter: res}
-	}
+	}*/
 
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
