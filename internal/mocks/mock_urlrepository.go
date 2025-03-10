@@ -35,6 +35,21 @@ func (m *MockURLRepositoryInterface) EXPECT() *MockURLRepositoryInterfaceMockRec
 	return m.recorder
 }
 
+// GetShortURLByOrigin mocks base method.
+func (m *MockURLRepositoryInterface) GetShortURLByOrigin(ctx context.Context, originalURL string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShortURLByOrigin", ctx, originalURL)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetShortURLByOrigin indicates an expected call of GetShortURLByOrigin.
+func (mr *MockURLRepositoryInterfaceMockRecorder) GetShortURLByOrigin(ctx, originalURL interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShortURLByOrigin", reflect.TypeOf((*MockURLRepositoryInterface)(nil).GetShortURLByOrigin), ctx, originalURL)
+}
+
 // GetURL mocks base method.
 func (m *MockURLRepositoryInterface) GetURL(ctx context.Context, shorten string) (*model.URLObject, error) {
 	m.ctrl.T.Helper()

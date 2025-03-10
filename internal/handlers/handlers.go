@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/repositories"
 	"github.com/Totarae/URLShortener/internal/storage"
 	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -42,15 +44,6 @@ type BatchShortenRequest struct {
 type BatchShortenResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
-}
-
-type gzipResponseWriter struct {
-	io.Writer
-	http.ResponseWriter
-}
-
-func (w gzipResponseWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
 }
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
@@ -97,7 +90,25 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 	if h.Mode == "database" {
 		err = h.Repo.SaveURL(req.Context(), urlObj)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// URL уже существует, получаем его сокращённый вариант
+				existingShortURL, lookupErr := h.Repo.GetShortURLByOrigin(req.Context(), originalURL)
+				if lookupErr != nil {
+					h.Logger.Error("Ошибка получения существующего сокращённого URL", zap.Error(lookupErr))
+					http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+
+				// Сразу отстреливаем ответ
+				res.Header().Set("Content-Type", "text/plain")
+				res.WriteHeader(http.StatusConflict)
+				res.Write([]byte(h.baseURL + "/" + existingShortURL))
+				return
+			}
+
 			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
 
 	} else if h.Mode == "file" {
@@ -215,7 +226,23 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	if h.Mode == "database" {
 		err = h.Repo.SaveURL(req.Context(), urlObj)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// URL уже существует, возвращаем существующий сокращённый URL
+				existingShortURL, lookupErr := h.Repo.GetShortURLByOrigin(req.Context(), originalURL)
+				if lookupErr != nil {
+					h.Logger.Error("Ошибка получения существующего сокращённого URL", zap.Error(lookupErr))
+					http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				response := ShortenResponse{Result: h.baseURL + "/" + existingShortURL}
+				res.Header().Set("Content-Type", "application/json")
+				res.WriteHeader(http.StatusConflict)
+				json.NewEncoder(res).Encode(response)
+				return
+			}
 			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
 
 	} else if h.Mode == "file" {
@@ -250,14 +277,6 @@ func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request) {
-
-	// Разархивируем тело запроса, если оно в gzip
-	/*body, err := decompressRequestBody(req)
-	if err != nil {
-		http.Error(res, "Failed to decompress request", http.StatusBadRequest)
-		return
-	}
-	defer body.Close()*/
 
 	if req.Body == nil {
 		http.Error(res, "Empty request body", http.StatusBadRequest)
@@ -323,13 +342,6 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 			}
 		}
 	}
-
-	// Проверяем, поддерживает ли клиент gzip, и если да, сжимаем ответ
-	/*gzipWriter, useGzip := compressResponse(res, req)
-	if useGzip {
-		defer gzipWriter.Close()
-		res = gzipResponseWriter{Writer: gzipWriter, ResponseWriter: res}
-	}*/
 
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
