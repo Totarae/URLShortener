@@ -14,6 +14,7 @@ import (
 type URLRepositoryInterface interface {
 	SaveURL(ctx context.Context, urlObj *model.URLObject) error
 	GetURL(ctx context.Context, shorten string) (*model.URLObject, error)
+	SaveBatchURLs(ctx context.Context, urlObjs []*model.URLObject) error
 	Ping(ctx context.Context) error
 }
 
@@ -52,4 +53,26 @@ func (r *URLRepository) GetURL(ctx context.Context, shorten string) (*model.URLO
 func (r *URLRepository) Ping(ctx context.Context) error {
 	_, err := r.DB.(*database.DB).Pool.Exec(ctx, "SELECT 1")
 	return err
+}
+
+func (r *URLRepository) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLObject) error {
+	tx, err := r.DB.(*database.DB).Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	query := `INSERT INTO urls (origin, shorten, created) VALUES ($1, $2, $3) RETURNING id`
+	for _, obj := range urlObjs {
+		err := tx.QueryRow(ctx, query, obj.Origin, obj.Shorten, obj.Created).Scan(&obj.ID)
+		if err != nil {
+			return fmt.Errorf("failed to insert batch URLs: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }

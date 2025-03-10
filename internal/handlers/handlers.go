@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/model"
@@ -32,6 +33,50 @@ type ShortenRequest struct {
 
 type ShortenResponse struct {
 	Result string `json:"result"`
+}
+
+type BatchShortenRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchShortenResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+// gzipMiddleware для автоматического разархивирования входящих данных
+func decompressRequestBody(req *http.Request) (io.ReadCloser, error) {
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(req.Body)
+		if err != nil {
+			return nil, err
+		}
+		return gzipReader, nil
+	}
+	return req.Body, nil
+}
+
+// gzipMiddleware для сжатия ответа
+func compressResponse(res http.ResponseWriter, req *http.Request) (*gzip.Writer, bool) {
+	if !strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
+		return nil, false
+	}
+
+	res.Header().Set("Content-Encoding", "gzip")
+	res.Header().Set("Vary", "Accept-Encoding")
+
+	gzipWriter := gzip.NewWriter(res)
+	return gzipWriter, true
 }
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
@@ -228,4 +273,91 @@ func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	res.WriteHeader(http.StatusOK)
 	res.Write([]byte("OK"))
+}
+
+func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request) {
+
+	// Разархивируем тело запроса, если оно в gzip
+	body, err := decompressRequestBody(req)
+	if err != nil {
+		http.Error(res, "Failed to decompress request", http.StatusBadRequest)
+		return
+	}
+	defer body.Close()
+
+	if req.Body == nil {
+		http.Error(res, "Empty request body", http.StatusBadRequest)
+		return
+	}
+
+	var batchRequest []BatchShortenRequest
+	decoder := json.NewDecoder(req.Body)
+	if err := decoder.Decode(&batchRequest); err != nil {
+		http.Error(res, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(batchRequest) == 0 {
+		http.Error(res, "Batch request is empty", http.StatusBadRequest)
+		return
+	}
+
+	var batchResponse []BatchShortenResponse
+	var urlObjects []*model.URLObject
+
+	for _, item := range batchRequest {
+		originalURL := strings.TrimSpace(item.OriginalURL)
+		parsedURL, err := url.ParseRequestURI(originalURL)
+		if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+			continue
+		}
+
+		shortURL := util.GenerateShortURL(originalURL)
+		shortFullURL := h.baseURL + "/" + shortURL
+
+		urlObj := &model.URLObject{
+			Origin:  originalURL,
+			Shorten: shortURL,
+			Created: time.Now(),
+		}
+
+		urlObjects = append(urlObjects, urlObj)
+		batchResponse = append(batchResponse, BatchShortenResponse{
+			CorrelationID: item.CorrelationID,
+			ShortURL:      shortFullURL,
+		})
+	}
+
+	if h.Mode == "database" {
+		if err := h.Repo.SaveBatchURLs(req.Context(), urlObjects); err != nil {
+			h.Logger.Error("Ошибка сохранения batch URL в БД", zap.Error(err))
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	} else if h.Mode == "file" {
+		for _, obj := range urlObjects {
+			entry := model.Entry{ShortURL: obj.Shorten, OriginalURL: obj.Origin}
+			if err := h.store.AppendToFile(entry); err != nil {
+				log.Printf("Ошибка сохранения в файл: %v", err)
+			}
+			h.store.Save(obj.Shorten, obj.Origin)
+		}
+	} else {
+		for _, obj := range urlObjects {
+			if err := util.SaveURL(obj.Origin, obj.Shorten, h.store); err != nil {
+				log.Printf("Ошибка сохранения в память: %v", err)
+			}
+		}
+	}
+
+	// Проверяем, поддерживает ли клиент gzip, и если да, сжимаем ответ
+	gzipWriter, useGzip := compressResponse(res, req)
+	if useGzip {
+		defer gzipWriter.Close()
+		res = gzipResponseWriter{Writer: gzipWriter, ResponseWriter: res}
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
+	json.NewEncoder(res).Encode(batchResponse)
 }
