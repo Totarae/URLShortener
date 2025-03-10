@@ -7,6 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	model "github.com/Totarae/URLShortener/internal/model"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -31,6 +32,20 @@ func NewMockStorage(ctrl *gomock.Controller) *MockStorage {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
+}
+
+// AppendToFile mocks base method.
+func (m *MockStorage) AppendToFile(entry model.Entry) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendToFile", entry)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AppendToFile indicates an expected call of AppendToFile.
+func (mr *MockStorageMockRecorder) AppendToFile(entry interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendToFile", reflect.TypeOf((*MockStorage)(nil).AppendToFile), entry)
 }
 
 // Get mocks base method.

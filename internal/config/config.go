@@ -99,8 +99,8 @@ func (cfg *Config) Validate() error {
 	if cfg.FileStoragePath == "" {
 		return fmt.Errorf("путь к файлу хранилища не может быть пустым")
 	}
-	if cfg.DatabaseDSN == "" || cfg.PgMigrationsPath == "" {
+	/*	if cfg.DatabaseDSN == "" || cfg.PgMigrationsPath == "" {
 		return fmt.Errorf("адрес подключения к БД не может быть пустым")
-	}
+	}*/
 	return nil
 }

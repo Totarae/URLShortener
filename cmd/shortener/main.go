@@ -45,12 +45,14 @@ func main() {
 			logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
 		}
 		repo = repositories.NewURLRepository(db)
-	} else if cfg.Mode == "in-memory" {
+	} else if cfg.Mode == "file" {
+		store = util.NewURLStore(cfg.FileStoragePath)
+	} else {
 		store = util.NewURLStore(cfg.FileStoragePath)
 	}
 
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger)
+	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode)
 
 	r := router.NewRouter(handler, logger)
 

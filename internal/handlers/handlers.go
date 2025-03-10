@@ -23,6 +23,7 @@ type Handler struct {
 	baseURL string
 	Repo    repositories.URLRepositoryInterface
 	Logger  *zap.Logger
+	Mode    string
 }
 
 type ShortenRequest struct {
@@ -35,12 +36,13 @@ type ShortenResponse struct {
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger) *Handler {
+func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		Repo:    repo,
 		Logger:  logger,
+		Mode:    mode,
 	}
 }
 
@@ -66,20 +68,27 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 	}
 
 	shortURL := util.GenerateShortURL(originalURL)
-
+	log.Printf("Generated URL: %s", shortURL)
 	urlObj := &model.URLObject{
 		Origin:  originalURL,
 		Shorten: shortURL,
 		Created: time.Now(),
 	}
 
-	if h.Repo != nil {
+	if h.Mode == "database" {
 		err = h.Repo.SaveURL(req.Context(), urlObj)
 		if err != nil {
 			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
 		}
 
-	} else if h.store != nil {
+	} else if h.Mode == "file" {
+		log.Printf("In file saving")
+		entry := model.Entry{ShortURL: shortURL, OriginalURL: originalURL}
+		if err := h.store.AppendToFile(entry); err != nil {
+			log.Printf("Ошибка сохранения в файл: %v", err)
+		}
+		h.store.Save(shortURL, originalURL)
+	} else {
 		if err := util.SaveURL(originalURL, shortURL, h.store); err != nil {
 			log.Printf("Ошибка сохранения в память: %v", err)
 		}
@@ -106,10 +115,9 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Println("Incoming ID : ", id)
 	var originalURL string
 
-	if h.Repo != nil {
+	if h.Mode == "database" {
 		urlObj, err := h.Repo.GetURL(req.Context(), id)
 		if err != nil {
 			h.Logger.Error("Ошибка получения URL из БД", zap.Error(err))
@@ -122,7 +130,7 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 		}
 		originalURL = urlObj.Origin // Теперь правильно присваиваем оригинальный URL
 
-	} else if h.store != nil {
+	} else {
 		var exists bool
 		// Ищем оригинальный URL в хранилище
 		originalURL, exists = h.store.Get(id)
@@ -130,7 +138,6 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 			http.NotFound(res, req)
 			return
 		}
-
 	}
 
 	if originalURL == "" && h.store != nil {
