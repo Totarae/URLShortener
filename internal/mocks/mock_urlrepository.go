@@ -64,6 +64,20 @@ func (mr *MockURLRepositoryInterfaceMockRecorder) Ping(ctx interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockURLRepositoryInterface)(nil).Ping), ctx)
 }
 
+// SaveBatchURLs mocks base method.
+func (m *MockURLRepositoryInterface) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLObject) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveBatchURLs", ctx, urlObjs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveBatchURLs indicates an expected call of SaveBatchURLs.
+func (mr *MockURLRepositoryInterfaceMockRecorder) SaveBatchURLs(ctx, urlObjs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveBatchURLs", reflect.TypeOf((*MockURLRepositoryInterface)(nil).SaveBatchURLs), ctx, urlObjs)
+}
+
 // SaveURL mocks base method.
 func (m *MockURLRepositoryInterface) SaveURL(ctx context.Context, urlObj *model.URLObject) error {
 	m.ctrl.T.Helper()
