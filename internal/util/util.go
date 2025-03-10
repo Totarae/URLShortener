@@ -61,14 +61,18 @@ func (s *URLStore) Get(short string) (string, bool) {
 }
 
 // GenerateShortURL creates a shortened URL
-func GenerateShortURL(originalURL string, baseURL string, store storage.Storage) string {
+func GenerateShortURL(originalURL string) string {
 	hash := sha256.Sum256([]byte(originalURL))
 	hashString := base64.RawURLEncoding.EncodeToString(hash[:16])
 	hashString = strings.ToLower(hashString) // Ensure lowercase for consistency
 
-	store.Save(hashString, originalURL) // Store in the map
+	return hashString
+}
 
-	return baseURL + "/" + hashString
+// SaveURL Сохранить URL в памяти
+func SaveURL(originalURL string, storeURL string, store storage.Storage) error {
+	store.Save(storeURL, originalURL) // Store in the map
+	return nil
 }
 
 // LoadFromFile загружает данные из файла при старте сервера

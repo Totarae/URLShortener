@@ -6,6 +6,7 @@ import (
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/database"
 	"github.com/Totarae/URLShortener/internal/handlers"
+	"github.com/Totarae/URLShortener/internal/repositories"
 	"github.com/Totarae/URLShortener/internal/router"
 	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/golang-migrate/migrate/v4"
@@ -13,7 +14,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"go.uber.org/zap"
 	"net/http"
-	"os"
 )
 
 func main() {
@@ -28,6 +28,8 @@ func main() {
 	cfg := config.NewConfig()
 
 	var db *database.DB
+	var store *util.URLStore
+	var repo *repositories.URLRepository
 
 	if cfg.Mode == "database" {
 		db, err = database.NewDB(logger)
@@ -42,20 +44,13 @@ func main() {
 		if err := runPgMigrations(cfg); err != nil {
 			logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
 		}
-		if db == nil {
-			logger.Error("DB is null 2222")
-		}
-	}
-
-	store := util.NewURLStore(cfg.FileStoragePath)
-
-	if db == nil {
-		logger.Error("DB is null")
-		logger.Info("DB config", zap.String("Global", os.Getenv("DATABASE_DSN")))
+		repo = repositories.NewURLRepository(db)
+	} else if cfg.Mode == "in-memory" {
+		store = util.NewURLStore(cfg.FileStoragePath)
 	}
 
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, db, logger)
+	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger)
 
 	r := router.NewRouter(handler, logger)
 

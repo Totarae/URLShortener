@@ -3,22 +3,25 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Totarae/URLShortener/internal/database"
+	"github.com/Totarae/URLShortener/internal/model"
+	"github.com/Totarae/URLShortener/internal/repositories"
 	"github.com/Totarae/URLShortener/internal/storage"
 	"github.com/Totarae/URLShortener/internal/util"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Handler struct {
 	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
-	DB      database.DBInterface
+	Repo    repositories.URLRepositoryInterface
 	Logger  *zap.Logger
 }
 
@@ -32,11 +35,11 @@ type ShortenResponse struct {
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store storage.Storage, baseURL string, db database.DBInterface, logger *zap.Logger) *Handler {
+func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
-		DB:      db,
+		Repo:    repo,
 		Logger:  logger,
 	}
 }
@@ -62,7 +65,28 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortURL := util.GenerateShortURL(originalURL, h.baseURL, h.store)
+	shortURL := util.GenerateShortURL(originalURL)
+
+	urlObj := &model.URLObject{
+		Origin:  originalURL,
+		Shorten: shortURL,
+		Created: time.Now(),
+	}
+
+	if h.Repo != nil {
+		err = h.Repo.SaveURL(req.Context(), urlObj)
+		if err != nil {
+			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
+		}
+
+	} else if h.store != nil {
+		if err := util.SaveURL(originalURL, shortURL, h.store); err != nil {
+			log.Printf("Ошибка сохранения в память: %v", err)
+		}
+	}
+
+	shortURL = h.baseURL + "/" + shortURL
+
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
 	res.Write([]byte(shortURL))
@@ -83,9 +107,43 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 	}
 
 	fmt.Println("Incoming ID : ", id)
-	// Ищем оригинальный URL в хранилище
-	originalURL, exists := h.store.Get(id)
-	if !exists {
+	var originalURL string
+
+	if h.Repo != nil {
+		urlObj, err := h.Repo.GetURL(req.Context(), id)
+		if err != nil {
+			h.Logger.Error("Ошибка получения URL из БД", zap.Error(err))
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		if urlObj == nil {
+			http.NotFound(res, req)
+			return
+		}
+		originalURL = urlObj.Origin // Теперь правильно присваиваем оригинальный URL
+
+	} else if h.store != nil {
+		var exists bool
+		// Ищем оригинальный URL в хранилище
+		originalURL, exists = h.store.Get(id)
+		if !exists {
+			http.NotFound(res, req)
+			return
+		}
+
+	}
+
+	if originalURL == "" && h.store != nil {
+		var exists bool
+		originalURL, exists = h.store.Get(id)
+		if exists {
+			fmt.Println("Found in store:", originalURL)
+		} else {
+			fmt.Println("Not found in store")
+		}
+	}
+
+	if originalURL == "" {
 		http.NotFound(res, req)
 		return
 	}
@@ -120,7 +178,27 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	shortURL := util.GenerateShortURL(originalURL, h.baseURL, h.store)
+	shortURL := util.GenerateShortURL(originalURL)
+
+	urlObj := &model.URLObject{
+		Origin:  originalURL,
+		Shorten: shortURL,
+		Created: time.Now(),
+	}
+
+	if h.Repo != nil {
+		err = h.Repo.SaveURL(req.Context(), urlObj)
+		if err != nil {
+			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
+		}
+
+	} else if h.store != nil {
+		if err := util.SaveURL(originalURL, shortURL, h.store); err != nil {
+			log.Printf("Ошибка сохранения в память: %v", err)
+		}
+	}
+
+	shortURL = h.baseURL + "/" + shortURL
 
 	response := ShortenResponse{Result: shortURL}
 	res.Header().Set("Content-Type", "application/json")
@@ -129,10 +207,7 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
-	if h.DB == nil {
-		h.Logger.Error("DB interface is null")
-	}
-	if err := h.DB.Ping(req.Context()); err != nil {
+	if err := h.Repo.Ping(req.Context()); err != nil {
 		h.Logger.Error("Database ping failed", zap.Error(err))
 		http.Error(res, "Internal Server Error", http.StatusInternalServerError)
 		return
