@@ -193,13 +193,20 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 		Created: time.Now(),
 	}
 
-	if h.Repo != nil {
+	if h.Mode == "database" {
 		err = h.Repo.SaveURL(req.Context(), urlObj)
 		if err != nil {
 			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
 		}
 
-	} else if h.store != nil {
+	} else if h.Mode == "file" {
+		log.Printf("In file saving")
+		entry := model.Entry{ShortURL: shortURL, OriginalURL: originalURL}
+		if err := h.store.AppendToFile(entry); err != nil {
+			log.Printf("Ошибка сохранения в файл: %v", err)
+		}
+		h.store.Save(shortURL, originalURL)
+	} else {
 		if err := util.SaveURL(originalURL, shortURL, h.store); err != nil {
 			log.Printf("Ошибка сохранения в память: %v", err)
 		}
