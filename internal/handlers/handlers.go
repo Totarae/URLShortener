@@ -285,13 +285,8 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	}
 	defer body.Close()
 
-	if req.Body == nil {
-		http.Error(res, "Empty request body", http.StatusBadRequest)
-		return
-	}
-
 	var batchRequest []BatchShortenRequest
-	decoder := json.NewDecoder(req.Body)
+	decoder := json.NewDecoder(body)
 	if err := decoder.Decode(&batchRequest); err != nil {
 		http.Error(res, "Invalid JSON", http.StatusBadRequest)
 		return
