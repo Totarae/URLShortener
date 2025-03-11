@@ -143,9 +143,7 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	shortURL = h.baseURL + "/" + shortURL
 
-	res.Header().Set("Content-Type", "text/plain")
-	res.WriteHeader(http.StatusCreated)
-	res.Write([]byte(shortURL))
+	h.respondText(res, http.StatusCreated, shortURL)
 }
 
 func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
@@ -258,12 +256,10 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	shortURL = h.baseURL + "/" + shortURL
+	//shortURL = h.baseURL + "/" + shortURL
 
-	response := ShortenResponse{Result: shortURL}
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
-	json.NewEncoder(res).Encode(response)
 }
 
 func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
