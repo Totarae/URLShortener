@@ -58,6 +58,43 @@ func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepo
 	}
 }
 
+func (h *Handler) validateURL(originalURL string) bool {
+	// Проверка корректности URL
+	parsedURL, err := url.ParseRequestURI(originalURL)
+	return err == nil || (parsedURL.Scheme != "" && parsedURL.Host != "")
+}
+
+func (h *Handler) saveToDatabase(req *http.Request, res http.ResponseWriter, urlObj *model.URLObject) error {
+	err := h.Repo.SaveURL(req.Context(), urlObj)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			existingShortURL, lookupErr := h.Repo.GetShortURLByOrigin(req.Context(), urlObj.Origin)
+			if lookupErr != nil {
+				h.Logger.Error("Ошибка получения существующего сокращённого URL", zap.Error(lookupErr))
+				h.respondError(res, http.StatusInternalServerError, "Internal Server Error")
+				return lookupErr
+			}
+			h.respondText(res, http.StatusConflict, h.baseURL+"/"+existingShortURL)
+			return nil
+		}
+		h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
+		h.respondError(res, http.StatusInternalServerError, "Internal Server Error")
+		return err
+	}
+	return nil
+}
+
+func (h *Handler) respondError(res http.ResponseWriter, statusCode int, message string) {
+	res.WriteHeader(statusCode)
+	res.Write([]byte(message))
+}
+
+func (h *Handler) respondText(res http.ResponseWriter, statusCode int, message string) {
+	res.Header().Set("Content-Type", "text/plain")
+	res.WriteHeader(statusCode)
+	res.Write([]byte(message))
+}
+
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
@@ -72,10 +109,9 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL empty", http.StatusBadRequest)
 		return
 	}
-	// Проверка корректности URL
-	parsedURL, err := url.ParseRequestURI(originalURL)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		http.Error(res, "Invalid URL", http.StatusBadRequest)
+
+	if !h.validateURL(originalURL) {
+		h.respondError(res, http.StatusBadRequest, "Invalid URL")
 		return
 	}
 
@@ -88,26 +124,7 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if h.Mode == "database" {
-		err = h.Repo.SaveURL(req.Context(), urlObj)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				// URL уже существует, получаем его сокращённый вариант
-				existingShortURL, lookupErr := h.Repo.GetShortURLByOrigin(req.Context(), originalURL)
-				if lookupErr != nil {
-					h.Logger.Error("Ошибка получения существующего сокращённого URL", zap.Error(lookupErr))
-					http.Error(res, "Internal Server Error", http.StatusInternalServerError)
-					return
-				}
-
-				// Сразу отстреливаем ответ
-				res.Header().Set("Content-Type", "text/plain")
-				res.WriteHeader(http.StatusConflict)
-				res.Write([]byte(h.baseURL + "/" + existingShortURL))
-				return
-			}
-
-			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
-			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+		if err := h.saveToDatabase(req, res, urlObj); err != nil {
 			return
 		}
 
@@ -224,24 +241,7 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if h.Mode == "database" {
-		err = h.Repo.SaveURL(req.Context(), urlObj)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				// URL уже существует, возвращаем существующий сокращённый URL
-				existingShortURL, lookupErr := h.Repo.GetShortURLByOrigin(req.Context(), originalURL)
-				if lookupErr != nil {
-					h.Logger.Error("Ошибка получения существующего сокращённого URL", zap.Error(lookupErr))
-					http.Error(res, "Internal Server Error", http.StatusInternalServerError)
-					return
-				}
-				response := ShortenResponse{Result: h.baseURL + "/" + existingShortURL}
-				res.Header().Set("Content-Type", "application/json")
-				res.WriteHeader(http.StatusConflict)
-				json.NewEncoder(res).Encode(response)
-				return
-			}
-			h.Logger.Error("Ошибка сохранения URL в БД", zap.Error(err))
-			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+		if err := h.saveToDatabase(req, res, urlObj); err != nil {
 			return
 		}
 
