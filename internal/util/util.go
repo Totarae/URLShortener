@@ -4,18 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/storage"
 	"log"
 	"os"
 	"strings"
 	"sync"
 )
-
-// Entry представляет структуру записи URL в файле
-type Entry struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
 
 // URLStore provides a thread-safe URL storage
 type URLStore struct {
@@ -46,8 +41,8 @@ func (s *URLStore) Save(short, original string) {
 	s.data[short] = original
 
 	// Сохраняем в файл
-	entry := Entry{ShortURL: short, OriginalURL: original}
-	if err := s.appendToFile(entry); err != nil {
+	entry := model.Entry{ShortURL: short, OriginalURL: original}
+	if err := s.AppendToFile(entry); err != nil {
 		log.Printf("Ошибка сохранения в файл: %v", err)
 	}
 }
@@ -61,14 +56,18 @@ func (s *URLStore) Get(short string) (string, bool) {
 }
 
 // GenerateShortURL creates a shortened URL
-func GenerateShortURL(originalURL string, baseURL string, store storage.Storage) string {
+func GenerateShortURL(originalURL string) string {
 	hash := sha256.Sum256([]byte(originalURL))
 	hashString := base64.RawURLEncoding.EncodeToString(hash[:16])
 	hashString = strings.ToLower(hashString) // Ensure lowercase for consistency
 
-	store.Save(hashString, originalURL) // Store in the map
+	return hashString
+}
 
-	return baseURL + "/" + hashString
+// SaveURL Сохранить URL в памяти
+func SaveURL(originalURL string, storeURL string, store storage.Storage) error {
+	store.Save(storeURL, originalURL) // Store in the map
+	return nil
 }
 
 // LoadFromFile загружает данные из файла при старте сервера
@@ -85,7 +84,7 @@ func (s *URLStore) LoadFromFile() error {
 	decoder := json.NewDecoder(file)
 
 	for {
-		var entry Entry
+		var entry model.Entry
 		if err := decoder.Decode(&entry); err != nil {
 			break
 		}
@@ -96,8 +95,8 @@ func (s *URLStore) LoadFromFile() error {
 	return nil
 }
 
-// appendToFile добавляет новую запись в файл
-func (s *URLStore) appendToFile(entry Entry) error {
+// AppendToFile добавляет новую запись в файл
+func (s *URLStore) AppendToFile(entry model.Entry) error {
 	file, err := os.OpenFile(s.file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
