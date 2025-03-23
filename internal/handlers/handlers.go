@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/repositories"
 	"github.com/Totarae/URLShortener/internal/storage"
@@ -26,6 +27,7 @@ type Handler struct {
 	Repo    repositories.URLRepositoryInterface
 	Logger  *zap.Logger
 	Mode    string
+	Auth    *auth.Auth
 }
 
 type ShortenRequest struct {
@@ -46,19 +48,28 @@ type BatchShortenResponse struct {
 	ShortURL      string `json:"short_url"`
 }
 
+type UserURLResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string) *Handler {
+func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string, authService *auth.Auth) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		Repo:    repo,
 		Logger:  logger,
 		Mode:    mode,
+		Auth:    authService,
 	}
 }
 
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
+
+	// Получаем или создаём userID через куку
+	userID := h.Auth.GetOrSetUserID(res, req)
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -85,6 +96,7 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		Origin:  originalURL,
 		Shorten: shortURL,
 		Created: time.Now(),
+		UserID:  userID,
 	}
 
 	if h.Mode == "database" {
@@ -346,4 +358,35 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
 	json.NewEncoder(res).Encode(batchResponse)
+}
+
+func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.Auth.ValidateUserID(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urlObjs, err := h.Repo.GetURLsByUserID(r.Context(), userID)
+	if err != nil {
+		h.Logger.Error("Ошибка получения URL пользователя", zap.Error(err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(urlObjs) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	var response []UserURLResponse
+	for _, u := range urlObjs {
+		response = append(response, UserURLResponse{
+			ShortURL:    fmt.Sprintf("%s/%s", h.baseURL, u.Shorten),
+			OriginalURL: u.Origin,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

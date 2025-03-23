@@ -17,6 +17,7 @@ type URLRepositoryInterface interface {
 	SaveBatchURLs(ctx context.Context, urlObjs []*model.URLObject) error
 	Ping(ctx context.Context) error
 	GetShortURLByOrigin(ctx context.Context, originalURL string) (string, error)
+	GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error)
 }
 
 type URLRepository struct {
@@ -28,12 +29,12 @@ func NewURLRepository(db database.DBInterface) *URLRepository {
 }
 
 func (r *URLRepository) SaveURL(ctx context.Context, urlObj *model.URLObject) error {
-	query := `INSERT INTO urls (origin, shorten, created) 
-              VALUES ($1, $2, $3) 
+	query := `INSERT INTO urls (origin, shorten, created, user_id) 
+              VALUES ($1, $2, $3, $4) 
               ON CONFLICT (origin) DO NOTHING 
               RETURNING id`
 
-	err := r.DB.(*database.DB).Pool.QueryRow(ctx, query, urlObj.Origin, urlObj.Shorten, time.Now()).Scan(&urlObj.ID)
+	err := r.DB.(*database.DB).Pool.QueryRow(ctx, query, urlObj.Origin, urlObj.Shorten, time.Now(), urlObj.UserID).Scan(&urlObj.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Если произошёл конфликт (уже есть такой origin), то получаем существующий shorten
@@ -102,4 +103,25 @@ func (r *URLRepository) GetShortURLByOrigin(ctx context.Context, originalURL str
 		return "", fmt.Errorf("database query error: %w", err)
 	}
 	return shortURL, nil
+}
+
+func (r *URLRepository) GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error) {
+	query := `SELECT id, origin, shorten, created FROM urls WHERE user_id = $1`
+	rows, err := r.DB.(*database.DB).Pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query URLs by user: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*model.URLObject
+	for rows.Next() {
+		obj := &model.URLObject{}
+		err := rows.Scan(&obj.ID, &obj.Origin, &obj.Shorten, &obj.Created)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		results = append(results, obj)
+	}
+
+	return results, nil
 }
