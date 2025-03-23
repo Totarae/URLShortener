@@ -26,6 +26,7 @@ func NewRouter(handler *handlers.Handler, logger *zap.Logger) *chi.Mux {
 
 	// 🔐 Защищённый маршрут — только для авторизованных пользователей
 	r.Get("/api/user/urls", handler.GetUserURLs)
+	r.Delete("/api/user/urls", handler.DeleteUserURLs)
 
 	return r
 }

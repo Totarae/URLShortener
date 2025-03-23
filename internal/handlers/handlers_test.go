@@ -22,7 +22,7 @@ func setupMockHandler(t *testing.T, mockURL *mocks.MockURLRepositoryInterface, m
 	defer logger.Sync()
 
 	baseURL := "http://localhost:8080"
-  
+
 	authService := auth.New("test-secret") // используем простой секрет для теста
 
 	return NewHandler(mockStore, baseURL, mockURL, logger, mode, authService)
@@ -211,6 +211,39 @@ func TestResponseURL_WrongMethod(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, resp.StatusCode)
 	}
+}
+
+func TestResponseURL_Deleted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockURLRepositoryInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+	h := setupMockHandler(t, mockRepo, mockStore, "database")
+
+	shortID := "dead123"
+
+	mockRepo.EXPECT().GetURL(gomock.Any(), shortID).Return(&model.URLObject{
+		Shorten:   shortID,
+		Origin:    "https://example.com/deleted",
+		IsDeleted: true,
+	}, nil).Times(1)
+
+	r := chi.NewRouter()
+	r.Get("/{id}", h.ResponseURL)
+
+	req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", shortID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusGone, resp.StatusCode)
 }
 
 func TestReceiveShorten(t *testing.T) {

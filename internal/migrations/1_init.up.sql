@@ -3,5 +3,6 @@ CREATE TABLE urls (
                       origin VARCHAR(100) NOT NULL UNIQUE,
                       shorten TEXT NOT NULL UNIQUE,
                       created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                      user_id TEXT
+                      user_id TEXT,
+                        is_deleted BOOLEAN NOT NULL DEFAULT FALSE
 );

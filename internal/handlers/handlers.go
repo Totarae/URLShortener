@@ -170,6 +170,10 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 			http.NotFound(res, req)
 			return
 		}
+		if urlObj.IsDeleted {
+			http.Error(res, "gone", http.StatusGone)
+			return
+		}
 		originalURL = urlObj.Origin // Теперь правильно присваиваем оригинальный URL
 
 	} else {
@@ -360,18 +364,18 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	json.NewEncoder(res).Encode(batchResponse)
 }
 
-func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-	userID := h.Auth.GetOrSetUserID(w, r) // создаст куку, если её нет
+func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
+	userID := h.Auth.GetOrSetUserID(res, req) // создаст куку, если её нет
 
-	urlObjs, err := h.Repo.GetURLsByUserID(r.Context(), userID)
+	urlObjs, err := h.Repo.GetURLsByUserID(req.Context(), userID)
 	if err != nil {
 		h.Logger.Error("Ошибка получения URL пользователя", zap.Error(err))
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(res, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	if len(urlObjs) == 0 {
-		w.WriteHeader(http.StatusNoContent)
+		res.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -383,6 +387,34 @@ func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	res.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(res).Encode(response)
+}
+
+func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
+	userID := h.Auth.GetOrSetUserID(res, req)
+
+	var shortenIDs []string
+	if err := json.NewDecoder(req.Body).Decode(&shortenIDs); err != nil {
+		http.Error(res, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	go func(ids []string, userID string) {
+		const batchSize = 100
+		for i := 0; i < len(ids); i += batchSize {
+			end := i + batchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			batch := ids[i:end]
+
+			err := h.Repo.MarkURLsAsDeleted(req.Context(), batch, userID)
+			if err != nil {
+				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
+			}
+		}
+	}(shortenIDs, userID)
+
+	res.WriteHeader(http.StatusAccepted)
 }
