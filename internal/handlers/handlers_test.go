@@ -307,6 +307,9 @@ func TestGetUserURLs_Unauthorized(t *testing.T) {
 	mockStore := mocks.NewMockStorage(ctrl)
 	h := setupMockHandler(t, mockRepo, mockStore, "database")
 
+	// Ожидаем, что вызов GetURLsByUserID произойдёт с новым userID
+	mockRepo.EXPECT().GetURLsByUserID(gomock.Any(), gomock.Any()).Return([]*model.URLObject{}, nil).Times(1)
+
 	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
 	w := httptest.NewRecorder()
 
@@ -315,7 +318,11 @@ func TestGetUserURLs_Unauthorized(t *testing.T) {
 	resp := w.Result()
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+
+	// Проверим, что кука действительно установлена
+	setCookie := resp.Header.Get("Set-Cookie")
+	assert.NotEmpty(t, setCookie, "Ожидалась установка новой auth_token куки")
 }
 
 func TestGetUserURLs_InvalidCookie(t *testing.T) {
@@ -326,8 +333,10 @@ func TestGetUserURLs_InvalidCookie(t *testing.T) {
 	mockStore := mocks.NewMockStorage(ctrl)
 	h := setupMockHandler(t, mockRepo, mockStore, "database")
 
+	// Ожидаем, что кука будет проигнорирована, и будет создан новый userID
+	mockRepo.EXPECT().GetURLsByUserID(gomock.Any(), gomock.Any()).Return([]*model.URLObject{}, nil).Times(1)
+
 	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
-	// Кука с неправильной подписью
 	req.AddCookie(&http.Cookie{
 		Name:  "auth_token",
 		Value: "someuserid:invalidsignature",
@@ -339,7 +348,10 @@ func TestGetUserURLs_InvalidCookie(t *testing.T) {
 	resp := w.Result()
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+
+	setCookie := resp.Header.Get("Set-Cookie")
+	assert.NotEmpty(t, setCookie, "Ожидалась переустановка куки с новым user_id")
 }
 
 func TestGetUserURLs_NoContent(t *testing.T) {

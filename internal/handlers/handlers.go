@@ -361,11 +361,7 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 }
 
 func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := h.Auth.ValidateUserID(r)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := h.Auth.GetOrSetUserID(w, r) // создаст куку, если её нет
 
 	urlObjs, err := h.Repo.GetURLsByUserID(r.Context(), userID)
 	if err != nil {
