@@ -400,6 +400,8 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	fmt.Printf("DeleteUserURLs called: userID=%s, ids=%v\n", userID, shortenIDs)
+
 	go func(ids []string, userID string) {
 		const batchSize = 100
 		for i := 0; i < len(ids); i += batchSize {
