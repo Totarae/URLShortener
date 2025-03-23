@@ -22,7 +22,7 @@ func setupMockHandler(t *testing.T, mockURL *mocks.MockURLRepositoryInterface, m
 	defer logger.Sync()
 
 	baseURL := "http://localhost:8080"
-
+  
 	authService := auth.New("test-secret") // используем простой секрет для теста
 
 	return NewHandler(mockStore, baseURL, mockURL, logger, mode, authService)
