@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -404,6 +405,7 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 
 	go func(ids []string, userID string) {
 		const batchSize = 100
+		ctx := context.Background()
 		for i := 0; i < len(ids); i += batchSize {
 			end := i + batchSize
 			if end > len(ids) {
@@ -411,7 +413,7 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 			}
 			batch := ids[i:end]
 
-			err := h.Repo.MarkURLsAsDeleted(req.Context(), batch, userID)
+			err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID)
 			if err != nil {
 				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
 			}
