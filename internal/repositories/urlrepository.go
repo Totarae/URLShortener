@@ -106,6 +106,27 @@ func (r *URLRepository) GetShortURLByOrigin(ctx context.Context, originalURL str
 	return shortURL, nil
 }
 
+func (r *URLRepository) GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error) {
+	query := `SELECT id, origin, shorten, created FROM urls WHERE user_id = $1`
+	rows, err := r.DB.(*database.DB).Pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query URLs by user: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*model.URLObject
+	for rows.Next() {
+		obj := &model.URLObject{}
+		err := rows.Scan(&obj.ID, &obj.Origin, &obj.Shorten, &obj.Created)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		results = append(results, obj)
+	}
+
+	return results, nil
+}
+
 func (r *URLRepository) MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error {
 	if len(ids) == 0 {
 		return nil
