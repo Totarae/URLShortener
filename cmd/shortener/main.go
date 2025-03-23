@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/database"
 	"github.com/Totarae/URLShortener/internal/handlers"
@@ -51,8 +52,10 @@ func main() {
 		store = util.NewURLStore(cfg.FileStoragePath)
 	}
 
+	authService := auth.New("rainbow-secret-key") // секрет должен быть из .env или конфигурации
+
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode)
+	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode, authService)
 
 	r := router.NewRouter(handler, logger)
 
