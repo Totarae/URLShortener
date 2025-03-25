@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/repositories"
 	"github.com/Totarae/URLShortener/internal/storage"
@@ -26,6 +28,7 @@ type Handler struct {
 	Repo    repositories.URLRepositoryInterface
 	Logger  *zap.Logger
 	Mode    string
+	Auth    *auth.Auth
 }
 
 type ShortenRequest struct {
@@ -46,19 +49,28 @@ type BatchShortenResponse struct {
 	ShortURL      string `json:"short_url"`
 }
 
+type UserURLResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
-func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string) *Handler {
+func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string, authService *auth.Auth) *Handler {
 	return &Handler{
 		store:   store,
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		Repo:    repo,
 		Logger:  logger,
 		Mode:    mode,
+		Auth:    authService,
 	}
 }
 
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
+
+	// Получаем или создаём userID через куку
+	userID := h.Auth.GetOrSetUserID(res, req)
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -85,6 +97,7 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 		Origin:  originalURL,
 		Shorten: shortURL,
 		Created: time.Now(),
+		UserID:  userID,
 	}
 
 	if h.Mode == "database" {
@@ -156,6 +169,10 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 		}
 		if urlObj == nil {
 			http.NotFound(res, req)
+			return
+		}
+		if urlObj.IsDeleted {
+			http.Error(res, "gone", http.StatusGone)
 			return
 		}
 		originalURL = urlObj.Origin // Теперь правильно присваиваем оригинальный URL
@@ -346,4 +363,62 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
 	json.NewEncoder(res).Encode(batchResponse)
+}
+
+func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
+	userID := h.Auth.GetOrSetUserID(res, req) // создаст куку, если её нет
+
+	urlObjs, err := h.Repo.GetURLsByUserID(req.Context(), userID)
+	if err != nil {
+		h.Logger.Error("Ошибка получения URL пользователя", zap.Error(err))
+		http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(urlObjs) == 0 {
+		res.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	var response []UserURLResponse
+	for _, u := range urlObjs {
+		response = append(response, UserURLResponse{
+			ShortURL:    fmt.Sprintf("%s/%s", h.baseURL, u.Shorten),
+			OriginalURL: u.Origin,
+		})
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(res).Encode(response)
+}
+
+func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
+	userID := h.Auth.GetOrSetUserID(res, req)
+
+	var shortenIDs []string
+	if err := json.NewDecoder(req.Body).Decode(&shortenIDs); err != nil {
+		http.Error(res, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("DeleteUserURLs called: userID=%s, ids=%v\n", userID, shortenIDs)
+
+	go func(ids []string, userID string) {
+		const batchSize = 100
+		ctx := context.Background()
+		for i := 0; i < len(ids); i += batchSize {
+			end := i + batchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			batch := ids[i:end]
+
+			err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID)
+			if err != nil {
+				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
+			}
+		}
+	}(shortenIDs, userID)
+
+	res.WriteHeader(http.StatusAccepted)
 }

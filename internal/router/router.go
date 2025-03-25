@@ -23,5 +23,10 @@ func NewRouter(handler *handlers.Handler, logger *zap.Logger) *chi.Mux {
 		r.Post("/", handler.ReceiveShorten)
 		r.Post("/batch", handler.BatchShortenHandler)
 	})
+
+	// 🔐 Защищённый маршрут — только для авторизованных пользователей
+	r.Get("/api/user/urls", handler.GetUserURLs)
+	r.Delete("/api/user/urls", handler.DeleteUserURLs)
+
 	return r
 }

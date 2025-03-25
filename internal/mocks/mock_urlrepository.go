@@ -65,6 +65,35 @@ func (mr *MockURLRepositoryInterfaceMockRecorder) GetURL(ctx, shorten interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURL", reflect.TypeOf((*MockURLRepositoryInterface)(nil).GetURL), ctx, shorten)
 }
 
+// GetURLsByUserID mocks base method.
+func (m *MockURLRepositoryInterface) GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetURLsByUserID", ctx, userID)
+	ret0, _ := ret[0].([]*model.URLObject)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetURLsByUserID indicates an expected call of GetURLsByUserID.
+func (mr *MockURLRepositoryInterfaceMockRecorder) GetURLsByUserID(ctx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURLsByUserID", reflect.TypeOf((*MockURLRepositoryInterface)(nil).GetURLsByUserID), ctx, userID)
+}
+
+// MarkURLsAsDeleted mocks base method.
+func (m *MockURLRepositoryInterface) MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkURLsAsDeleted", ctx, ids, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkURLsAsDeleted indicates an expected call of MarkURLsAsDeleted.
+func (mr *MockURLRepositoryInterfaceMockRecorder) MarkURLsAsDeleted(ctx, ids, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkURLsAsDeleted", reflect.TypeOf((*MockURLRepositoryInterface)(nil).MarkURLsAsDeleted), ctx, ids, userID)
+}
+
 // Ping mocks base method.
 func (m *MockURLRepositoryInterface) Ping(ctx context.Context) error {
 	m.ctrl.T.Helper()
