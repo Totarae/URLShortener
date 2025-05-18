@@ -133,3 +133,18 @@ func BenchmarkResponseURL(b *testing.B) {
 		handler.ResponseURL(rec, req.Clone(context.Background()))
 	}
 }
+
+func ExampleHandler_ReceiveShorten() {
+	handler := setupTestHandler()
+	body := `{"url": "https://yandex.ru"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	handler.ReceiveShorten(rec, req)
+
+	fmt.Println(rec.Code == http.StatusCreated)
+
+	// Output:
+	// true
+}
