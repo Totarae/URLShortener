@@ -24,12 +24,14 @@ func TestSignAndValidate(t *testing.T) {
 func TestIssueCookie(t *testing.T) {
 	a := auth.New("test-secret")
 	rec := httptest.NewRecorder()
-
 	userID := a.GetOrSetUserID(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 
 	assert.NotEmpty(t, userID)
 
-	cookies := rec.Result().Cookies()
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	cookies := resp.Cookies()
 	assert.NotEmpty(t, cookies)
 	assert.Equal(t, "auth_token", cookies[0].Name)
 }
