@@ -34,24 +34,29 @@ type Handler struct {
 	Auth    *auth.Auth
 }
 
+// ShortenRequest представляет структуру запроса на сокращение URL.
 type ShortenRequest struct {
 	URL string `json:"url"`
 }
 
+// ShortenResponse представляет структуру ответа с сокращённым URL.
 type ShortenResponse struct {
 	Result string `json:"result"`
 }
 
+// BatchShortenRequest представляет одну запись в пакетном запросе на сокращение URL.
 type BatchShortenRequest struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
+// BatchShortenResponse представляет одну запись в пакетном ответе.
 type BatchShortenResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
 
+// UserURLResponse представляет пару оригинального и сокращённого URL пользователя.
 type UserURLResponse struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
