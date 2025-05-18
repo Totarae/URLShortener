@@ -2,6 +2,9 @@ package model
 
 import "time"
 
+// URLObject представляет зпись по короткой ссылке.
+// Используется для хранения оригинального URL, сокращённого идентификатора,
+// времени создания, принадлежности пользователю и флага удаления.
 type URLObject struct {
 	tableName struct{}  `pg:"urls"`
 	ID        uint      `pg:"id,notnull,pk"`
