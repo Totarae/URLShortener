@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// URLRepositoryInterface определяет методы репозитория
+// URLRepositoryInterface определяет методы репозитория и с хранилищем URL.
 type URLRepositoryInterface interface {
 	SaveURL(ctx context.Context, urlObj *model.URLObject) error
 	GetURL(ctx context.Context, shorten string) (*model.URLObject, error)
@@ -22,14 +22,18 @@ type URLRepositoryInterface interface {
 	MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error
 }
 
+// URLRepository реализует URLRepositoryInterface с использованием PostgreSQL.
 type URLRepository struct {
 	DB database.DBInterface
 }
 
+// NewURLRepository создаёт новый экземпляр URLRepository.
 func NewURLRepository(db database.DBInterface) *URLRepository {
 	return &URLRepository{DB: db}
 }
 
+// SaveURL сохраняет объект URL в базу данных.
+// Если origin уже существует, возвращает существующий shorten.
 func (r *URLRepository) SaveURL(ctx context.Context, urlObj *model.URLObject) error {
 	query := `INSERT INTO urls (origin, shorten, created, user_id) 
               VALUES ($1, $2, $3, $4) 
@@ -52,6 +56,7 @@ func (r *URLRepository) SaveURL(ctx context.Context, urlObj *model.URLObject) er
 	return nil
 }
 
+// GetURL извлекает оригинальный URL по сокращённому идентификатору.
 func (r *URLRepository) GetURL(ctx context.Context, shorten string) (*model.URLObject, error) {
 	query := `SELECT id, origin, shorten, created, is_deleted  FROM urls WHERE shorten = $1`
 	urlObj := &model.URLObject{}
@@ -67,11 +72,13 @@ func (r *URLRepository) GetURL(ctx context.Context, shorten string) (*model.URLO
 	return urlObj, nil
 }
 
+// Ping проверяет доступность базы данных.
 func (r *URLRepository) Ping(ctx context.Context) error {
 	_, err := r.DB.(*database.DB).Pool.Exec(ctx, "SELECT 1")
 	return err
 }
 
+// SaveBatchURLs сохраняет список URL-объектов в базе данных в рамках транзакции.
 func (r *URLRepository) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLObject) error {
 	tx, err := r.DB.(*database.DB).Pool.Begin(ctx)
 	if err != nil {
@@ -86,7 +93,6 @@ func (r *URLRepository) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLO
 			return fmt.Errorf("failed to insert batch URLs: %w", err)
 		}
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -94,6 +100,7 @@ func (r *URLRepository) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLO
 	return nil
 }
 
+// GetShortURLByOrigin возвращает сокращённый URL по оригинальному.
 func (r *URLRepository) GetShortURLByOrigin(ctx context.Context, originalURL string) (string, error) {
 	var shortURL string
 	query := `SELECT shorten FROM urls WHERE origin = $1`
@@ -107,6 +114,7 @@ func (r *URLRepository) GetShortURLByOrigin(ctx context.Context, originalURL str
 	return shortURL, nil
 }
 
+// GetURLsByUserID возвращает все сокращённые ссылки пользователя.
 func (r *URLRepository) GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error) {
 	query := `SELECT id, origin, shorten, created FROM urls WHERE user_id = $1`
 	rows, err := r.DB.(*database.DB).Pool.Query(ctx, query, userID)
@@ -128,6 +136,7 @@ func (r *URLRepository) GetURLsByUserID(ctx context.Context, userID string) ([]*
 	return results, nil
 }
 
+// MarkURLsAsDeleted помечает указанные ссылки как удалённые.
 func (r *URLRepository) MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error {
 	if len(ids) == 0 {
 		return nil
