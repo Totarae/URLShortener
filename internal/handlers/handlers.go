@@ -312,8 +312,8 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 		return
 	}
 
-	var batchResponse []BatchShortenResponse
-	var urlObjects []*model.URLObject
+	batchResponse := make([]BatchShortenResponse, 0, len(batchRequest))
+	urlObjects := make([]*model.URLObject, 0, len(batchRequest))
 
 	for _, item := range batchRequest {
 		originalURL := strings.TrimSpace(item.OriginalURL)
@@ -323,18 +323,15 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 		}
 
 		shortURL := util.GenerateShortURL(originalURL)
-		shortFullURL := h.baseURL + "/" + shortURL
 
-		urlObj := &model.URLObject{
+		urlObjects = append(urlObjects, &model.URLObject{
 			Origin:  originalURL,
 			Shorten: shortURL,
 			Created: time.Now(),
-		}
-
-		urlObjects = append(urlObjects, urlObj)
+		})
 		batchResponse = append(batchResponse, BatchShortenResponse{
 			CorrelationID: item.CorrelationID,
-			ShortURL:      shortFullURL,
+			ShortURL:      h.baseURL + "/" + shortURL,
 		})
 	}
 
@@ -355,7 +352,7 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	} else {
 		for _, obj := range urlObjects {
 			if err := util.SaveURL(obj.Origin, obj.Shorten, h.store); err != nil {
-				log.Printf("Ошибка сохранения в память: %v", err)
+				h.Logger.Error("Ошибка сохранения в память: %v", zap.Error(err))
 			}
 		}
 	}
@@ -380,7 +377,7 @@ func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var response []UserURLResponse
+	response := make([]UserURLResponse, 0, len(urlObjs))
 	for _, u := range urlObjs {
 		response = append(response, UserURLResponse{
 			ShortURL:    fmt.Sprintf("%s/%s", h.baseURL, u.Shorten),
@@ -401,11 +398,9 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Printf("DeleteUserURLs called: userID=%s, ids=%v\n", userID, shortenIDs)
-
-	go func(ids []string, userID string) {
+	ctx := req.Context()
+	go func(ctx context.Context, ids []string, userID string) {
 		const batchSize = 100
-		ctx := context.Background()
 		for i := 0; i < len(ids); i += batchSize {
 			end := i + batchSize
 			if end > len(ids) {
@@ -418,7 +413,7 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
 			}
 		}
-	}(shortenIDs, userID)
+	}(ctx, shortenIDs, userID)
 
 	res.WriteHeader(http.StatusAccepted)
 }
