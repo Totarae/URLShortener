@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/mocks"
@@ -415,4 +416,66 @@ func TestGetUserURLs_NoContent(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+}
+
+func TestDeleteUserURLs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockURLRepositoryInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+	h := setupMockHandler(t, mockRepo, mockStore, "database")
+
+	userID := "user-delete-test"
+	signedCookie := h.Auth.SignCookieValue(userID)
+	body := `["id1", "id2", "id3"]`
+
+	mockRepo.EXPECT().
+		MarkURLsAsDeleted(gomock.Any(), gomock.Any(), userID).
+		Return(nil).
+		Times(1)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: signedCookie})
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	h.DeleteUserURLs(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	time.Sleep(50 * time.Millisecond) // задержка для ожидания горутины
+}
+
+func TestBatchShortenHandler_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockURLRepositoryInterface(ctrl)
+	mockStore := mocks.NewMockStorage(ctrl)
+	handler := setupMockHandler(t, mockRepo, mockStore, "database")
+
+	input := `[{"correlation_id":"abc","original_url":"https://yandex.ru"},{"correlation_id":"def","original_url":"https://google.com"}]`
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(input))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	// Ожидаем вызов SaveBatchURLs
+	mockRepo.EXPECT().
+		SaveBatchURLs(gomock.Any(), gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	handler.BatchShortenHandler(w, req)
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(body), "short_url")
 }

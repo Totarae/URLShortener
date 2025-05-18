@@ -23,6 +23,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handler содержит зависимости и реализует HTTP-обработчики
+// для операций с сокращёнными ссылками (создание, получение, удаление и т.д.).
 type Handler struct {
 	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
@@ -57,6 +59,8 @@ type UserURLResponse struct {
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
+// NewHandler создаёт новый экземпляр Handler с заданным хранилищем, базовым URL,
+// реализацией репозитория, логгером, режимом работы (file/database) и сервисом аутентификации.
 func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string, authService *auth.Auth) *Handler {
 	return &Handler{
 		store:   store,
@@ -68,6 +72,8 @@ func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepo
 	}
 }
 
+// ReceiveURL принимает plain-текст ссылку в теле запроса,
+// генерирует сокращённый вариант и возвращает его в ответе.
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	// Получаем или создаём userID через куку
@@ -145,6 +151,8 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte(shortURL))
 }
 
+// ResponseURL перенаправляет по сокращённому идентификатору на оригинальный URL,
+// если он существует и не удалён.
 func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
@@ -208,6 +216,8 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// ReceiveShorten принимает JSON-запрос с оригинальным URL,
+// сохраняет и возвращает сокращённый URL в формате JSON.
 func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	var request ShortenRequest
 	if req.Body == nil {
@@ -284,6 +294,8 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(response)
 }
 
+// PingHandler выполняет проверку подключения к базе данных.
+// Возвращает 200 OK, если соединение активно.
 func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 	if err := h.Repo.Ping(req.Context()); err != nil {
 		h.Logger.Error("Database ping failed", zap.Error(err))
@@ -294,6 +306,8 @@ func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte("OK"))
 }
 
+// BatchShortenHandler обрабатывает пакетный JSON-запрос со множеством ссылок,
+// и возвращает массив сокращённых ссылок с их корреляционными ID.
 func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request) {
 
 	if req.Body == nil {
@@ -363,6 +377,8 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	json.NewEncoder(res).Encode(batchResponse)
 }
 
+// GetUserURLs возвращает все активные сокращённые ссылки пользователя
+// в формате JSON. Использует идентификатор пользователя из cookie.
 func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 	userID := h.Auth.GetOrSetUserID(res, req) // создаст куку, если её нет
 
@@ -390,6 +406,8 @@ func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(response)
 }
 
+// DeleteUserURLs помечает заданные ссылки пользователя как удалённые.
+// Принимает JSON-массив сокращённых ID в теле запроса.
 func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 	userID := h.Auth.GetOrSetUserID(res, req)
 
