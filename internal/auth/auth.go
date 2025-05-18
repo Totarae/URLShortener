@@ -16,10 +16,12 @@ const (
 	cookieMaxAge = 365 * 24 * 60 * 60 // 1 год
 )
 
+// Auth представляет сервис аутентификации пользователей.
 type Auth struct {
 	SecretKey string
 }
 
+// New создает новый экземпляр Auth с заданным секретным ключом.
 func New(secret string) *Auth {
 	return &Auth{SecretKey: secret}
 }
@@ -45,7 +47,8 @@ func (a *Auth) issueCookie(w http.ResponseWriter) string {
 	return userID
 }
 
-// Проверим наличие и корректность куки auth
+// GetOrSetUserID возвращает идентификатор пользователя из cookie.
+// Если cookie отсутствует или повреждена — устанавливает новую.
 func (a *Auth) GetOrSetUserID(w http.ResponseWriter, r *http.Request) string {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil || cookie.Value == "" {
@@ -60,7 +63,7 @@ func (a *Auth) GetOrSetUserID(w http.ResponseWriter, r *http.Request) string {
 	return parts[0]
 }
 
-// проверить, авторизован ли пользователь
+// ValidateUserID проверяет корректность подписи куки и возвращает userID и флаг валидности.
 func (a *Auth) ValidateUserID(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil || cookie.Value == "" {
@@ -75,7 +78,8 @@ func (a *Auth) ValidateUserID(r *http.Request) (string, bool) {
 	return parts[0], true
 }
 
-// Имитация валидной куки для тестов
+// SignCookieValue возвращает строку куки с валидной подписью для заданного userID.
+// Используется в тестах.
 func (a *Auth) SignCookieValue(userID string) string {
 	sig := a.sign(userID)
 	return fmt.Sprintf("%s:%s", userID, sig)
