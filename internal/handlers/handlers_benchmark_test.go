@@ -3,18 +3,19 @@ package handlers_test
 import (
 	"context"
 	"fmt"
-	"github.com/Totarae/URLShortener/internal/auth"
-	"github.com/Totarae/URLShortener/internal/handlers"
-	"github.com/Totarae/URLShortener/internal/model"
-	"github.com/Totarae/URLShortener/internal/util"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Totarae/URLShortener/internal/auth"
+	"github.com/Totarae/URLShortener/internal/handlers"
+	"github.com/Totarae/URLShortener/internal/model"
+	"github.com/Totarae/URLShortener/internal/util"
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type mockRepo struct{}

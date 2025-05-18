@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/repositories"
@@ -13,13 +21,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
-	"io"
-	"log"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
-	"time"
 )
 
 type Handler struct {

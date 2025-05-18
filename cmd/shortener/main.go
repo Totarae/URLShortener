@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/config"
 	"github.com/Totarae/URLShortener/internal/database"
@@ -14,7 +16,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 func main() {

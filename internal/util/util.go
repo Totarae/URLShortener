@@ -4,12 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/Totarae/URLShortener/internal/model"
-	"github.com/Totarae/URLShortener/internal/storage"
 	"log"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/Totarae/URLShortener/internal/model"
+	"github.com/Totarae/URLShortener/internal/storage"
 )
 
 // URLStore provides a thread-safe URL storage

@@ -3,6 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/mocks"
 	"github.com/Totarae/URLShortener/internal/model"
@@ -10,11 +16,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
 )
 
 func setupMockHandler(t *testing.T, mockURL *mocks.MockURLRepositoryInterface, mockStore *mocks.MockStorage, mode string) *Handler {
