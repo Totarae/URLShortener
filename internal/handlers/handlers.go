@@ -398,8 +398,8 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ctx := req.Context()
-	go func(ctx context.Context, ids []string, userID string) {
+	go func(ids []string, userID string) {
+		ctx := context.Background() // безопасный независимый контекст
 		const batchSize = 100
 		for i := 0; i < len(ids); i += batchSize {
 			end := i + batchSize
@@ -408,12 +408,11 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 			}
 			batch := ids[i:end]
 
-			err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID)
-			if err != nil {
+			if err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID); err != nil {
 				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
 			}
 		}
-	}(ctx, shortenIDs, userID)
+	}(shortenIDs, userID)
 
 	res.WriteHeader(http.StatusAccepted)
 }
