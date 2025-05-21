@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/repositories"
@@ -13,15 +21,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
-	"io"
-	"log"
-	"net/http"
-	"net/url"
-	"regexp"
-	"strings"
-	"time"
 )
 
+// Handler содержит зависимости и реализует HTTP-обработчики
+// для операций с сокращёнными ссылками (создание, получение, удаление и т.д.).
 type Handler struct {
 	store   storage.Storage // Use the new URLStore for thread safety
 	baseURL string
@@ -31,24 +34,29 @@ type Handler struct {
 	Auth    *auth.Auth
 }
 
+// ShortenRequest представляет структуру запроса на сокращение URL.
 type ShortenRequest struct {
 	URL string `json:"url"`
 }
 
+// ShortenResponse представляет структуру ответа с сокращённым URL.
 type ShortenResponse struct {
 	Result string `json:"result"`
 }
 
+// BatchShortenRequest представляет одну запись в пакетном запросе на сокращение URL.
 type BatchShortenRequest struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
+// BatchShortenResponse представляет одну запись в пакетном ответе.
 type BatchShortenResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
 
+// UserURLResponse представляет пару оригинального и сокращённого URL пользователя.
 type UserURLResponse struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
@@ -56,6 +64,8 @@ type UserURLResponse struct {
 
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
+// NewHandler создаёт новый экземпляр Handler с заданным хранилищем, базовым URL,
+// реализацией репозитория, логгером, режимом работы (file/database) и сервисом аутентификации.
 func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string, authService *auth.Auth) *Handler {
 	return &Handler{
 		store:   store,
@@ -67,6 +77,8 @@ func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepo
 	}
 }
 
+// ReceiveURL принимает plain-текст ссылку в теле запроса,
+// генерирует сокращённый вариант и возвращает его в ответе.
 func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 
 	// Получаем или создаём userID через куку
@@ -144,6 +156,8 @@ func (h *Handler) ReceiveURL(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte(shortURL))
 }
 
+// ResponseURL перенаправляет по сокращённому идентификатору на оригинальный URL,
+// если он существует и не удалён.
 func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
@@ -207,6 +221,8 @@ func (h *Handler) ResponseURL(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// ReceiveShorten принимает JSON-запрос с оригинальным URL,
+// сохраняет и возвращает сокращённый URL в формате JSON.
 func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	var request ShortenRequest
 	if req.Body == nil {
@@ -283,6 +299,8 @@ func (h *Handler) ReceiveShorten(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(response)
 }
 
+// PingHandler выполняет проверку подключения к базе данных.
+// Возвращает 200 OK, если соединение активно.
 func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 	if err := h.Repo.Ping(req.Context()); err != nil {
 		h.Logger.Error("Database ping failed", zap.Error(err))
@@ -293,6 +311,8 @@ func (h *Handler) PingHandler(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte("OK"))
 }
 
+// BatchShortenHandler обрабатывает пакетный JSON-запрос со множеством ссылок,
+// и возвращает массив сокращённых ссылок с их корреляционными ID.
 func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request) {
 
 	if req.Body == nil {
@@ -312,8 +332,8 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 		return
 	}
 
-	var batchResponse []BatchShortenResponse
-	var urlObjects []*model.URLObject
+	batchResponse := make([]BatchShortenResponse, 0, len(batchRequest))
+	urlObjects := make([]*model.URLObject, 0, len(batchRequest))
 
 	for _, item := range batchRequest {
 		originalURL := strings.TrimSpace(item.OriginalURL)
@@ -323,18 +343,15 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 		}
 
 		shortURL := util.GenerateShortURL(originalURL)
-		shortFullURL := h.baseURL + "/" + shortURL
 
-		urlObj := &model.URLObject{
+		urlObjects = append(urlObjects, &model.URLObject{
 			Origin:  originalURL,
 			Shorten: shortURL,
 			Created: time.Now(),
-		}
-
-		urlObjects = append(urlObjects, urlObj)
+		})
 		batchResponse = append(batchResponse, BatchShortenResponse{
 			CorrelationID: item.CorrelationID,
-			ShortURL:      shortFullURL,
+			ShortURL:      h.baseURL + "/" + shortURL,
 		})
 	}
 
@@ -355,7 +372,7 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	} else {
 		for _, obj := range urlObjects {
 			if err := util.SaveURL(obj.Origin, obj.Shorten, h.store); err != nil {
-				log.Printf("Ошибка сохранения в память: %v", err)
+				h.Logger.Error("Ошибка сохранения в память: %v", zap.Error(err))
 			}
 		}
 	}
@@ -365,6 +382,8 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	json.NewEncoder(res).Encode(batchResponse)
 }
 
+// GetUserURLs возвращает все активные сокращённые ссылки пользователя
+// в формате JSON. Использует идентификатор пользователя из cookie.
 func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 	userID := h.Auth.GetOrSetUserID(res, req) // создаст куку, если её нет
 
@@ -380,7 +399,7 @@ func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var response []UserURLResponse
+	response := make([]UserURLResponse, 0, len(urlObjs))
 	for _, u := range urlObjs {
 		response = append(response, UserURLResponse{
 			ShortURL:    fmt.Sprintf("%s/%s", h.baseURL, u.Shorten),
@@ -392,6 +411,8 @@ func (h *Handler) GetUserURLs(res http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(res).Encode(response)
 }
 
+// DeleteUserURLs помечает заданные ссылки пользователя как удалённые.
+// Принимает JSON-массив сокращённых ID в теле запроса.
 func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 	userID := h.Auth.GetOrSetUserID(res, req)
 
@@ -401,11 +422,9 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	fmt.Printf("DeleteUserURLs called: userID=%s, ids=%v\n", userID, shortenIDs)
-
 	go func(ids []string, userID string) {
+		ctx := context.Background() // безопасный независимый контекст
 		const batchSize = 100
-		ctx := context.Background()
 		for i := 0; i < len(ids); i += batchSize {
 			end := i + batchSize
 			if end > len(ids) {
@@ -413,8 +432,7 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 			}
 			batch := ids[i:end]
 
-			err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID)
-			if err != nil {
+			if err := h.Repo.MarkURLsAsDeleted(ctx, batch, userID); err != nil {
 				h.Logger.Error("Ошибка при пометке URL как удалённых", zap.Error(err))
 			}
 		}

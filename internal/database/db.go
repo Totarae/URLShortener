@@ -9,18 +9,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// DBInterface определяет интерфейс для взаимодействия с базой данных.
 type DBInterface interface {
 	Ping(ctx context.Context) error
 	Close()
 }
 
-// DB представляет подключение к БД
+// DB представляет подключение к БД PostgreSQL.
 type DB struct {
 	Pool   *pgxpool.Pool
 	Logger *zap.Logger
 }
 
-// NewDB создает новое подключение к БД
+// NewDB создает новое подключение к БД.
 func NewDB(logger *zap.Logger) (*DB, error) {
 	dsn := os.Getenv("DATABASE_DSN")
 	if dsn == "" {
@@ -40,7 +41,7 @@ func NewDB(logger *zap.Logger) (*DB, error) {
 	return &DB{Pool: pool, Logger: logger}, nil
 }
 
-// Ping проверяет соединение с БД
+// Ping проверяет соединение с БД.
 func (db *DB) Ping(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
@@ -48,7 +49,7 @@ func (db *DB) Ping(ctx context.Context) error {
 	return db.Pool.Ping(ctx)
 }
 
-// Close закрывает соединение с БД
+// Close закрывает соединение с БД.
 func (db *DB) Close() {
 	db.Pool.Close()
 }

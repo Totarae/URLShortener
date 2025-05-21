@@ -1,17 +1,22 @@
 package middleware
 
 import (
-	"go.uber.org/zap"
 	"net/http"
 	"time"
+
+	"go.uber.org/zap"
 )
 
+// loggingResponseWriter оборачивает http.ResponseWriter для отслеживания
+// статуса ответа и количества переданных байт.
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	size       int
 }
 
+// LoggingMiddleware создаёт middleware для логирования HTTP-запросов.
+// Логирует метод, URI, статус ответа, размер и длительность обработки.
 func LoggingMiddleware(loggrt *zap.Logger) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(resp http.ResponseWriter, r *http.Request) {
@@ -33,11 +38,13 @@ func LoggingMiddleware(loggrt *zap.Logger) func(handler http.Handler) http.Handl
 	}
 }
 
+// WriteHeader сохраняет статус ответа и вызывает оригинальный WriteHeader.
 func (lw *loggingResponseWriter) WriteHeader(code int) {
 	lw.statusCode = code
 	lw.ResponseWriter.WriteHeader(code)
 }
 
+// Write сохраняет размер ответа и вызывает оригинальный Write.
 func (lw *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := lw.ResponseWriter.Write(b)
 	lw.size += size

@@ -7,17 +7,18 @@ import (
 	"strings"
 )
 
-// gzipResponseWriter оборачивает ResponseWriter и использует gzip.Writer для сжатия ответа
+// gzipResponseWriter оборачивает ResponseWriter и использует gzip.Writer для сжатия ответа.
 type gzipResponseWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
 
+// Write записывает данные в поток gzip.
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 	return g.Writer.Write(b)
 }
 
-// GzipMiddleware добавляет поддержку gzip для входящих и исходящих данных
+// GzipMiddleware добавляет поддержку gzip для входящих и исходящих данных.
 func GzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Распаковываем входящие gzip-запросы
