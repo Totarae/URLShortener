@@ -9,12 +9,14 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+// Analyzer представляет анализатор, запрещающий использовать os.Exit в функции main.
 var Analyzer = &analysis.Analyzer{
 	Name: "noexit",
 	Doc:  "запрещает использовать os.Exit в функции main пакета main",
 	Run:  run,
 }
 
+// NewAnalyzer возвращает анализатор noexit.
 func NewAnalyzer() *analysis.Analyzer {
 	return Analyzer
 }
