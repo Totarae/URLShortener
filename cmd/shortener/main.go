@@ -36,7 +36,8 @@ func main() {
 	if cfg.Mode == "database" {
 		db, err = database.NewDB(logger)
 		if err != nil {
-			logger.Fatal("Ошибка подключения к базе данных", zap.Error(err))
+			logger.Error("Ошибка подключения к базе данных", zap.Error(err))
+			return
 		} else {
 			logger.Info("DSN: ", zap.String("DB", cfg.DatabaseDSN))
 		}
@@ -44,7 +45,9 @@ func main() {
 
 		// run Postgres migrations
 		if err := runPgMigrations(cfg); err != nil {
-			logger.Fatal("runPgMigrations failed: %w", zap.Error(err))
+
+			logger.Error("runPgMigrations failed", zap.Error(err))
+			return
 		}
 		repo = repositories.NewURLRepository(db)
 	} else if cfg.Mode == "file" {
@@ -62,7 +65,7 @@ func main() {
 
 	logger.Info("Сервер запущен на ", zap.String("address", cfg.ServerAddress))
 	if err := http.ListenAndServe(cfg.ServerAddress, r); err != nil {
-		logger.Fatal("Ошибка при запуске сервера: ", zap.Error(err))
+		logger.Error("Ошибка при запуске сервера: ", zap.Error(err))
 	}
 
 }

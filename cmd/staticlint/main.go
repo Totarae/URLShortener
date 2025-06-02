@@ -14,6 +14,7 @@
 package main
 
 import (
+	"github.com/Totarae/URLShortener/cmd/staticlint/noexit"
 	"github.com/timakin/bodyclose/passes/bodyclose"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
@@ -23,13 +24,12 @@ import (
 	"golang.org/x/tools/go/analysis/passes/shadow"
 	"golang.org/x/tools/go/analysis/passes/structtag"
 	"honnef.co/go/tools/staticcheck"
-
-	"github.com/Totarae/URLShortener/cmd/staticlint/noexit"
 )
 
 func main() {
 	var analyzers []*analysis.Analyzer
 
+	// стандартные анализаторы
 	analyzers = append(analyzers,
 		shadow.Analyzer,
 		structtag.Analyzer,
@@ -38,34 +38,31 @@ func main() {
 		printf.Analyzer,
 	)
 
-	// SA-анализаторы
-	for _, a := range staticcheck.Analyzers {
-		if a.Analyzer.Name[:2] == "SA" {
-			analyzers = append(analyzers, a.Analyzer)
+	// SA-анализаторы staticcheck
+	for _, info := range staticcheck.Analyzers {
+		if info.Analyzer != nil && len(info.Analyzer.Name) >= 2 && info.Analyzer.Name[:2] == "SA" {
+			analyzers = append(analyzers, info.Analyzer)
 		}
 	}
 
-	// не-SA:
-	if a := findAnalyzer("S1000"); a != nil {
-		analyzers = append(analyzers, a) // упрощения
-	}
-	if a := findAnalyzer("U1000"); a != nil {
-		analyzers = append(analyzers, a) // неиспользуемые параметры
+	// отдельные не-SA анализаторы
+	for _, name := range []string{"S1000", "U1000"} {
+		if a := findStaticcheckAnalyzer(name); a != nil {
+			analyzers = append(analyzers, a)
+		}
 	}
 
-	// публичный анализатор (не из staticcheck)
+	// внешние и собственные
 	analyzers = append(analyzers, bodyclose.Analyzer)
-
-	// собственный анализатор
 	analyzers = append(analyzers, noexit.NewAnalyzer())
 
 	multichecker.Main(analyzers...)
 }
 
-func findAnalyzer(name string) *analysis.Analyzer {
-	for _, a := range staticcheck.Analyzers {
-		if a.Analyzer.Name == name {
-			return a.Analyzer
+func findStaticcheckAnalyzer(name string) *analysis.Analyzer {
+	for _, info := range staticcheck.Analyzers {
+		if info.Analyzer != nil && info.Analyzer.Name == name {
+			return info.Analyzer
 		}
 	}
 	return nil
