@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/config"
@@ -27,14 +28,17 @@ var (
 
 func main() {
 
-	fmt.Println("Build version:", buildVersion)
-	fmt.Println("Build date:", buildDate)
-	fmt.Println("Build commit:", buildCommit)
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic("Не удалось инициализировать логгер")
 	}
 	defer logger.Sync()
+
+	logger.Info("Информация о сборке",
+		zap.String("Build version", buildVersion),
+		zap.String("Build date", buildDate),
+		zap.String("Build commit", buildCommit),
+	)
 
 	// Инициализация конфигурации
 	cfg := config.NewConfig()
@@ -74,8 +78,24 @@ func main() {
 	r := router.NewRouter(handler, logger)
 
 	logger.Info("Сервер запущен на ", zap.String("address", cfg.ServerAddress))
-	if err := http.ListenAndServe(cfg.ServerAddress, r); err != nil {
-		logger.Error("Ошибка при запуске сервера: ", zap.Error(err))
+
+	if cfg.EnableHTTPS {
+		if _, err := os.Stat(cfg.TLSCertPath); os.IsNotExist(err) {
+			logger.Fatal("Файл сертификата не найден", zap.String("path", cfg.TLSCertPath))
+		}
+		if _, err := os.Stat(cfg.TLSKeyPath); os.IsNotExist(err) {
+			logger.Fatal("Файл ключа не найден", zap.String("path", cfg.TLSKeyPath))
+		}
+
+		logger.Info("HTTPS включён", zap.String("cert", cfg.TLSCertPath), zap.String("key", cfg.TLSKeyPath))
+
+		if err := http.ListenAndServeTLS(cfg.ServerAddress, cfg.TLSCertPath, cfg.TLSKeyPath, r); err != nil {
+			logger.Fatal("Ошибка запуска HTTPS сервера", zap.Error(err))
+		}
+	} else {
+		if err := http.ListenAndServe(cfg.ServerAddress, r); err != nil {
+			logger.Fatal("Ошибка запуска HTTP сервера", zap.Error(err))
+		}
 	}
 
 }

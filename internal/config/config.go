@@ -17,6 +17,9 @@ type Config struct {
 	DatabaseDSN      string
 	PgMigrationsPath string
 	Mode             string
+	EnableHTTPS      bool
+	TLSCertPath      string
+	TLSKeyPath       string
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -27,6 +30,9 @@ func NewConfig() *Config {
 	viper.SetDefault("FILE_STORAGE_PATH", "data.json")
 	viper.SetDefault("DATABASE_DSN", "")
 	viper.SetDefault("PG_MIGRATIONS_PATH", "internal/migrations")
+	viper.SetDefault("ENABLE_HTTPS", false)
+	viper.SetDefault("TLS_CERT_PATH", "cert.pem")
+	viper.SetDefault("TLS_KEY_PATH", "key.pem")
 
 	viper.AutomaticEnv()
 
@@ -39,6 +45,9 @@ func NewConfig() *Config {
 	baseURL := flag.String("b", "", "base URL")
 	fileStoragePath := flag.String("f", "", "file storage path (JSON file)")
 	databaseDSN := flag.String("d", "", "PostgreSQL DSN")
+	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
+	tlsCertPath := flag.String("cert", "", "path to TLS certificate")
+	tlsKeyPath := flag.String("key", "", "path to TLS key")
 
 	flag.Parse()
 
@@ -49,6 +58,9 @@ func NewConfig() *Config {
 		FileStoragePath:  viper.GetString("FILE_STORAGE_PATH"),
 		DatabaseDSN:      viper.GetString("DATABASE_DSN"),
 		PgMigrationsPath: viper.GetString("PG_MIGRATIONS_PATH"),
+		EnableHTTPS:      viper.GetBool("ENABLE_HTTPS"),
+		TLSCertPath:      viper.GetString("TLS_CERT_PATH"),
+		TLSKeyPath:       viper.GetString("TLS_KEY_PATH"),
 	}
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -73,6 +85,17 @@ func NewConfig() *Config {
 		cfg.Mode = "file"
 	} else {
 		cfg.Mode = "in-memory"
+	}
+
+	// Включаем TLS
+	if *enableHTTPS {
+		cfg.EnableHTTPS = true
+	}
+	if *tlsCertPath != "" {
+		cfg.TLSCertPath = *tlsCertPath
+	}
+	if *tlsKeyPath != "" {
+		cfg.TLSKeyPath = *tlsKeyPath
 	}
 
 	log.Printf("Инициализация конфигурации: ServerAddress=%s", cfg.ServerAddress)
