@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -11,15 +12,15 @@ import (
 
 // Config хранит конфигурацию сервера
 type Config struct {
-	ServerAddress    string
-	BaseURL          string
-	FileStoragePath  string
-	DatabaseDSN      string
-	PgMigrationsPath string
-	Mode             string
-	EnableHTTPS      bool
-	TLSCertPath      string
-	TLSKeyPath       string
+	ServerAddress    string `json:"server_address"`
+	BaseURL          string `json:"base_url"`
+	FileStoragePath  string `json:"file_storage_path"`
+	DatabaseDSN      string `json:"database_dsn"`
+	PgMigrationsPath string `json:"pg_migrations_path"`
+	EnableHTTPS      bool   `json:"enable_https"`
+	TLSCertPath      string `json:"tls_cert_path"`
+	TLSKeyPath       string `json:"tls_key_path"`
+	Mode             string `json:"-"`
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -48,8 +49,26 @@ func NewConfig() *Config {
 	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
 	tlsCertPath := flag.String("cert", "", "path to TLS certificate")
 	tlsKeyPath := flag.String("key", "", "path to TLS key")
+	configPath := flag.String("c", "", "path to JSON config file")
+	flag.StringVar(configPath, "config", "", "path to JSON config file")
 
 	flag.Parse()
+
+	// Загружаем JSON-конфигурацию (если указана)
+	if *configPath == "" {
+		*configPath = os.Getenv("CONFIG")
+	}
+
+	type rawJSON Config
+	jsonCfg := &rawJSON{}
+	if *configPath != "" {
+		data, err := os.ReadFile(*configPath)
+		if err != nil {
+			log.Printf("Не удалось прочитать JSON-файл конфигурации %q: %v", *configPath, err)
+		} else if err := json.Unmarshal(data, jsonCfg); err != nil {
+			log.Printf("Ошибка разбора JSON-файла конфигурации: %v", err)
+		}
+	}
 
 	// Если переменные окружения заданы — они имеют высший приоритет
 	cfg := &Config{
@@ -62,6 +81,21 @@ func NewConfig() *Config {
 		TLSCertPath:      viper.GetString("TLS_CERT_PATH"),
 		TLSKeyPath:       viper.GetString("TLS_KEY_PATH"),
 	}
+
+	// Переопределяем значениями из переменных окружения (viper)
+	override := func(env string, target *string) {
+		if val := viper.GetString(env); val != "" {
+			*target = val
+		}
+	}
+	override("SERVER_ADDRESS", &cfg.ServerAddress)
+	override("BASE_URL", &cfg.BaseURL)
+	override("FILE_STORAGE_PATH", &cfg.FileStoragePath)
+	override("DATABASE_DSN", &cfg.DatabaseDSN)
+	override("PG_MIGRATIONS_PATH", &cfg.PgMigrationsPath)
+	override("TLS_CERT_PATH", &cfg.TLSCertPath)
+	override("TLS_KEY_PATH", &cfg.TLSKeyPath)
+	cfg.EnableHTTPS = viper.GetBool("ENABLE_HTTPS")
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
 	if *serverAddress != "" {
@@ -104,6 +138,8 @@ func NewConfig() *Config {
 	log.Printf("Инициализация конфигурации: DatabaseDSN=%s", cfg.DatabaseDSN)
 	log.Printf("Инициализация конфигурации: PgMigrationsPath=%s", cfg.PgMigrationsPath)
 	log.Printf("Инициализация конфигурации: Mode=%s", cfg.Mode)
+	log.Printf("Инициализация конфигурации: EnableHTTPS=%v", cfg.EnableHTTPS)
+
 	// Проверка корректности конфигурации
 	if err := cfg.Validate(); err != nil {
 		fmt.Printf("Ошибка конфигурации: %v\n", err)
