@@ -112,3 +112,29 @@ func (s *URLStore) AppendToFile(entry model.Entry) error {
 	_, err = file.WriteString(string(data) + "\n") // Записываем с новой строки
 	return err
 }
+
+// SaveToFile перезаписывает весь файл данными из памяти
+func (s *URLStore) SaveToFile() error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	file, err := os.Create(s.file)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	for short, original := range s.data {
+		entry := model.Entry{
+			ShortURL:    short,
+			OriginalURL: original,
+		}
+		if err := encoder.Encode(entry); err != nil {
+			return err
+		}
+	}
+
+	log.Printf("Сохранено %d URL-адресов в файл %s", len(s.data), s.file)
+	return nil
+}
