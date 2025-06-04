@@ -28,6 +28,9 @@ var (
 
 func main() {
 
+	fmt.Println("Build version:", buildVersion)
+	fmt.Println("Build date:", buildDate)
+	fmt.Println("Build commit:", buildCommit)
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic("Не удалось инициализировать логгер")
