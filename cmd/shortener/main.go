@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Totarae/URLShortener/internal/auth"
 	"github.com/Totarae/URLShortener/internal/config"
@@ -27,14 +32,17 @@ var (
 
 func main() {
 
-	fmt.Println("Build version:", buildVersion)
-	fmt.Println("Build date:", buildDate)
-	fmt.Println("Build commit:", buildCommit)
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic("Не удалось инициализировать логгер")
 	}
 	defer logger.Sync()
+
+	logger.Info("Информация о сборке",
+		zap.String("Build version", buildVersion),
+		zap.String("Build date", buildDate),
+		zap.String("Build commit", buildCommit),
+	)
 
 	// Инициализация конфигурации
 	cfg := config.NewConfig()
@@ -60,8 +68,6 @@ func main() {
 			return
 		}
 		repo = repositories.NewURLRepository(db)
-	} else if cfg.Mode == "file" {
-		store = util.NewURLStore(cfg.FileStoragePath)
 	} else {
 		store = util.NewURLStore(cfg.FileStoragePath)
 	}
@@ -73,10 +79,62 @@ func main() {
 
 	r := router.NewRouter(handler, logger)
 
-	logger.Info("Сервер запущен на ", zap.String("address", cfg.ServerAddress))
-	if err := http.ListenAndServe(cfg.ServerAddress, r); err != nil {
-		logger.Error("Ошибка при запуске сервера: ", zap.Error(err))
+	server := &http.Server{
+		Addr:    cfg.ServerAddress,
+		Handler: r,
 	}
+
+	// Контекст завершения по сигналу
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+
+	logger.Info("Сервер запущен на ", zap.String("address", cfg.ServerAddress))
+
+	// Запуск сервера
+	go func() {
+		logger.Info("Сервер запущен", zap.String("address", cfg.ServerAddress))
+		var err error
+		if cfg.EnableHTTPS {
+			if _, err := os.Stat(cfg.TLSCertPath); os.IsNotExist(err) {
+				logger.Fatal("Файл сертификата не найден", zap.String("path", cfg.TLSCertPath))
+			}
+			if _, err := os.Stat(cfg.TLSKeyPath); os.IsNotExist(err) {
+				logger.Fatal("Файл ключа не найден", zap.String("path", cfg.TLSKeyPath))
+			}
+			logger.Info("HTTPS включён", zap.String("cert", cfg.TLSCertPath), zap.String("key", cfg.TLSKeyPath))
+			err = server.ListenAndServeTLS(cfg.TLSCertPath, cfg.TLSKeyPath)
+		} else {
+			err = server.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("Ошибка сервера", zap.Error(err))
+		}
+	}()
+
+	// Ждём завершения
+	<-ctx.Done()
+	stop()
+	logger.Info("Получен сигнал завершения. Завершаем сервер...")
+
+	// Таймаут на graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Ошибка при завершении сервера", zap.Error(err))
+	}
+
+	// Сохраняем данные из хранилища
+	if cfg.Mode == "file" && store != nil {
+		if err := store.SaveToFile(); err != nil {
+			logger.Error("Ошибка при сохранении в файл", zap.Error(err))
+		} else {
+			logger.Info("Данные успешно сохранены в файл")
+		}
+	}
+
+	logger.Info("Сервер завершён корректно")
 
 }
 

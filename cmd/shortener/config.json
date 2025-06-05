@@ -1,0 +1,10 @@
+{
+  "server_address": "localhost:8443",
+  "base_url": "https://localhost:8443",
+  "file_storage_path": "data.json",
+  "database_dsn": "",
+  "pg_migrations_path": "internal/migrations",
+  "enable_https": true,
+  "tls_cert_path": "cert.pem",
+  "tls_key_path": "key.pem"
+}
