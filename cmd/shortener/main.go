@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,8 +75,17 @@ func main() {
 
 	authService := auth.New("rainbow-secret-key") // секрет должен быть из .env или конфигурации
 
+	var trustedNet *net.IPNet
+	if cfg.TrustedSubnet != "" {
+		_, parsedNet, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			logger.Fatal("Неверный формат trusted_subnet", zap.String("subnet", cfg.TrustedSubnet), zap.Error(err))
+		}
+		trustedNet = parsedNet
+	}
+
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode, authService)
+	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode, authService, trustedNet)
 
 	r := router.NewRouter(handler, logger)
 
