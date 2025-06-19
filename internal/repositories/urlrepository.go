@@ -20,6 +20,8 @@ type URLRepositoryInterface interface {
 	GetShortURLByOrigin(ctx context.Context, originalURL string) (string, error)
 	GetURLsByUserID(ctx context.Context, userID string) ([]*model.URLObject, error)
 	MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error
+	CountURLs(ctx context.Context) (int, error)
+	CountUsers(ctx context.Context) (int, error)
 }
 
 // URLRepository реализует URLRepositoryInterface с использованием PostgreSQL.
@@ -153,4 +155,18 @@ func (r *URLRepository) MarkURLsAsDeleted(ctx context.Context, ids []string, use
 		return fmt.Errorf("failed to mark URLs as deleted: %w", err)
 	}
 	return nil
+}
+
+// CountURLs количество сокращенных ссылок
+func (r *URLRepository) CountURLs(ctx context.Context) (int, error) {
+	var count int
+	err := r.DB.(*database.DB).Pool.QueryRow(ctx, "SELECT COUNT(*) FROM urls WHERE is_deleted = false").Scan(&count)
+	return count, err
+}
+
+// CountUsers количество пользователей
+func (r *URLRepository) CountUsers(ctx context.Context) (int, error) {
+	var count int
+	err := r.DB.(*database.DB).Pool.QueryRow(ctx, "SELECT COUNT(DISTINCT user_id) FROM urls WHERE user_id IS NOT NULL").Scan(&count)
+	return count, err
 }

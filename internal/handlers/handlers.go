@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -26,12 +27,13 @@ import (
 // Handler содержит зависимости и реализует HTTP-обработчики
 // для операций с сокращёнными ссылками (создание, получение, удаление и т.д.).
 type Handler struct {
-	store   storage.Storage // Use the new URLStore for thread safety
-	baseURL string
-	Repo    repositories.URLRepositoryInterface
-	Logger  *zap.Logger
-	Mode    string
-	Auth    *auth.Auth
+	store         storage.Storage // Use the new URLStore for thread safety
+	baseURL       string
+	Repo          repositories.URLRepositoryInterface
+	Logger        *zap.Logger
+	Mode          string
+	Auth          *auth.Auth
+	TrustedSubnet *net.IPNet
 }
 
 // ShortenRequest представляет структуру запроса на сокращение URL.
@@ -66,14 +68,16 @@ var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{6,22}$`)
 
 // NewHandler создаёт новый экземпляр Handler с заданным хранилищем, базовым URL,
 // реализацией репозитория, логгером, режимом работы (file/database) и сервисом аутентификации.
-func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger, mode string, authService *auth.Auth) *Handler {
+func NewHandler(store storage.Storage, baseURL string, repo repositories.URLRepositoryInterface, logger *zap.Logger,
+	mode string, authService *auth.Auth, trustedSubnet *net.IPNet) *Handler {
 	return &Handler{
-		store:   store,
-		baseURL: strings.TrimSuffix(baseURL, "/"),
-		Repo:    repo,
-		Logger:  logger,
-		Mode:    mode,
-		Auth:    authService,
+		store:         store,
+		baseURL:       strings.TrimSuffix(baseURL, "/"),
+		Repo:          repo,
+		Logger:        logger,
+		Mode:          mode,
+		Auth:          authService,
+		TrustedSubnet: trustedSubnet,
 	}
 }
 
@@ -439,4 +443,35 @@ func (h *Handler) DeleteUserURLs(res http.ResponseWriter, req *http.Request) {
 	}(shortenIDs, userID)
 
 	res.WriteHeader(http.StatusAccepted)
+}
+
+// GetStatsHandler для статистики
+func (h *Handler) GetStatsHandler(w http.ResponseWriter, r *http.Request) {
+	ipStr := r.Header.Get("X-Real-IP")
+	if ipStr == "" || h.TrustedSubnet == nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil || !h.TrustedSubnet.Contains(ip) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	urlCount, err := h.Repo.CountURLs(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	userCount, err := h.Repo.CountUsers(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]int{
+		"urls":  urlCount,
+		"users": userCount,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
