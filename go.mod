@@ -13,6 +13,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/timakin/bodyclose v0.0.0-20241222091800-1db5c5ca4d67
+	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/tools v0.33.0
 	honnef.co/go/tools v0.6.1
@@ -23,7 +24,6 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
 	github.com/gostaticanalysis/comment v1.4.2 // indirect
-	github.com/gostaticanalysis/nilerr v0.1.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

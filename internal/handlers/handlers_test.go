@@ -27,7 +27,7 @@ func setupMockHandler(t *testing.T, mockURL *mocks.MockURLRepositoryInterface, m
 
 	authService := auth.New("test-secret") // используем простой секрет для теста
 
-	return NewHandler(mockStore, baseURL, mockURL, logger, mode, authService)
+	return NewHandler(mockStore, baseURL, mockURL, logger, mode, authService, nil)
 }
 
 func TestReceiveURL(t *testing.T) {
