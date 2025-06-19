@@ -31,7 +31,9 @@ func (m *mockRepo) GetURLsByUserID(ctx context.Context, userID string) ([]*model
 func (m *mockRepo) MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error {
 	return nil
 }
-func (m *mockRepo) Ping(ctx context.Context) error { return nil }
+func (m *mockRepo) Ping(ctx context.Context) error              { return nil }
+func (m *mockRepo) CountURLs(ctx context.Context) (int, error)  { return 0, nil }
+func (m *mockRepo) CountUsers(ctx context.Context) (int, error) { return 0, nil }
 
 // ExampleHandler_ReceiveShorten демонстрирует работу метода ReceiveShorten.
 func ExampleHandler_ReceiveShorten() {
@@ -40,7 +42,7 @@ func ExampleHandler_ReceiveShorten() {
 	repo := &mockRepo{}
 	authService := auth.New("example-secret")
 
-	h := NewHandler(store, "http://localhost", repo, logger, "memory", authService)
+	h := NewHandler(store, "http://localhost", repo, logger, "memory", authService, nil)
 
 	body := `{"url":"https://yandex.ru"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(body))

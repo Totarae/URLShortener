@@ -20,6 +20,14 @@ import (
 
 type mockRepo struct{}
 
+func (m *mockRepo) CountURLs(ctx context.Context) (int, error) {
+	return 42, nil
+}
+
+func (m *mockRepo) CountUsers(ctx context.Context) (int, error) {
+	return 7, nil
+}
+
 func (m *mockRepo) SaveURL(ctx context.Context, u *model.URLObject) error {
 	return nil
 }
@@ -53,7 +61,7 @@ func setupTestHandler() *handlers.Handler {
 	logger, _ := zap.NewDevelopment()
 	authService := auth.New("bench-secret")
 
-	return handlers.NewHandler(store, "http://localhost:8080", repo, logger, "file", authService)
+	return handlers.NewHandler(store, "http://localhost:8080", repo, logger, "file", authService, nil)
 }
 
 func BenchmarkReceiveShorten(b *testing.B) {
