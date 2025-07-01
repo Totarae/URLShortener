@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -137,4 +139,16 @@ func (s *URLStore) SaveToFile() error {
 
 	log.Printf("Сохранено %d URL-адресов в файл %s", len(s.data), s.file)
 	return nil
+}
+
+// ValidateURL проверяет, что строка — это корректный URL с http/https схемой и хостом.
+func ValidateURL(raw string) (string, error) {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid URL")
+	}
+	return raw, nil
 }

@@ -475,3 +475,6 @@ func (h *Handler) GetStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(resp)
 }
+func (h *Handler) Store() storage.Storage {
+	return h.store
+}

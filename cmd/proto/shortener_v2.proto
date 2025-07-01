@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package shortener.v2;
+
+option go_package = ".";
+
+service ShortenerService {
+  rpc Shorten(ShortenRequest) returns (ShortenResponse);
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+}
+
+message ShortenRequest {
+  string user_id = 1;
+  string url = 2;
+}
+
+message ShortenResponse {
+  string short_url = 1;
+}
+
+message ResolveRequest {
+  string short_url = 1;
+}
+
+message ResolveResponse {
+  string original_url = 1;
+}

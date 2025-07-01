@@ -17,3 +17,9 @@ ock_database.go -package=mocks
 openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj "/CN=localhost"
 ````
 Для генерации сертификатов
+
+
+````
+ protoc -I=cmd/proto --go_out=cmd/proto_gen --go-grpc_out=cmd/proto_gen cmd/proto/shortener_v2.proto
+````
+Для генерации proto
