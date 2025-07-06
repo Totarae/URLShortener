@@ -22,6 +22,7 @@ type Config struct {
 	TLSKeyPath       string `json:"tls_key_path"`
 	Mode             string `json:"-"`
 	TrustedSubnet    string `json:"trusted_subnet"`
+	GRPCAddress      string `json:"grpc_address"`
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -36,6 +37,7 @@ func NewConfig() *Config {
 	viper.SetDefault("TLS_CERT_PATH", "cert.pem")
 	viper.SetDefault("TLS_KEY_PATH", "key.pem")
 	viper.SetDefault("TRUSTED_SUBNET", "")
+	viper.SetDefault("GRPC_ADDRESS", ":3200")
 
 	viper.AutomaticEnv()
 
@@ -53,6 +55,7 @@ func NewConfig() *Config {
 	tlsKeyPath := flag.String("key", "", "path to TLS key")
 	configPath := flag.String("c", "", "path to JSON config file")
 	trustedSubnet := flag.String("t", "", "trusted subnet in CIDR format")
+	grpcAddress := flag.String("grpc", "", "gRPC server address (default :3200)")
 	flag.StringVar(configPath, "config", "", "path to JSON config file")
 
 	flag.Parse()
@@ -84,6 +87,7 @@ func NewConfig() *Config {
 		TLSCertPath:      viper.GetString("TLS_CERT_PATH"),
 		TLSKeyPath:       viper.GetString("TLS_KEY_PATH"),
 		TrustedSubnet:    viper.GetString("TRUSTED_SUBNET"),
+		GRPCAddress:      viper.GetString("GRPC_ADDRESS"),
 	}
 
 	// Переопределяем значениями из переменных окружения (viper)
@@ -100,6 +104,7 @@ func NewConfig() *Config {
 	override("TLS_CERT_PATH", &cfg.TLSCertPath)
 	override("TLS_KEY_PATH", &cfg.TLSKeyPath)
 	override("TRUSTED_SUBNET", &cfg.TrustedSubnet)
+	override("GRPC_ADDRESS", &cfg.GRPCAddress)
 	cfg.EnableHTTPS = viper.GetBool("ENABLE_HTTPS")
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -119,6 +124,10 @@ func NewConfig() *Config {
 
 	if *trustedSubnet != "" {
 		cfg.TrustedSubnet = *trustedSubnet
+	}
+
+	if *grpcAddress != "" {
+		cfg.GRPCAddress = *grpcAddress
 	}
 
 	// Определяем режим работы

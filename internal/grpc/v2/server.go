@@ -41,7 +41,7 @@ func (s *GRPCServer) Shorten(ctx context.Context, req *pb.ShortenRequest) (*pb.S
 	}
 
 	if err := s.Handler.Repo.SaveURL(ctx, urlObj); err != nil {
-		// Например, если такая URL уже существует
+		// Если такая URL уже существует
 		return nil, status.Errorf(codes.AlreadyExists, "URL already exists")
 	}
 
@@ -75,4 +75,37 @@ func (s *GRPCServer) Resolve(ctx context.Context, req *pb.ResolveRequest) (*pb.R
 	}
 
 	return &pb.ResolveResponse{OriginalUrl: origin}, nil
+}
+
+func (s *GRPCServer) BatchShorten(ctx context.Context, req *pb.BatchShortenRequest) (*pb.BatchShortenResponse, error) {
+	if len(req.Urls) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no URLs provided")
+	}
+
+	results := make([]*pb.BatchShortenResult, 0, len(req.Urls))
+
+	for _, item := range req.Urls {
+		if item.OriginalUrl == "" || item.CorrelationId == "" {
+			continue
+		}
+
+		short := util.GenerateShortURL(item.OriginalUrl)
+		urlObj := &model.URLObject{
+			Origin:  item.OriginalUrl,
+			Shorten: short,
+			Created: time.Now(),
+			UserID:  req.UserId,
+		}
+
+		if err := s.Handler.Repo.SaveURL(ctx, urlObj); err != nil {
+			continue
+		}
+
+		results = append(results, &pb.BatchShortenResult{
+			CorrelationId: item.CorrelationId,
+			ShortUrl:      short,
+		})
+	}
+
+	return &pb.BatchShortenResponse{Items: results}, nil
 }

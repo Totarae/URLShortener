@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pb "github.com/Totarae/URLShortener/cmd/proto_gen"
+	v2 "github.com/Totarae/URLShortener/internal/grpc/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"net"
 	"net/http"
 	"os"
@@ -94,6 +98,27 @@ func main() {
 		Handler: r,
 	}
 
+	// gRPC
+	var grpcServer *grpc.Server
+	go func() {
+		grpcAddr := cfg.GRPCAddress
+		if grpcAddr == "" {
+			grpcAddr = ":3200"
+		}
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			logger.Fatal("Ошибка запуска gRPC сервера", zap.Error(err))
+		}
+		grpcServer = grpc.NewServer()
+		pb.RegisterShortenerServiceServer(grpcServer, v2.NewGRPCServer(handler))
+		reflection.Register(grpcServer) // достучатсья из курла
+
+		logger.Info("gRPC сервер запущен", zap.String("address", grpcAddr))
+		if err := grpcServer.Serve(lis); err != nil {
+			logger.Fatal("Ошибка работы gRPC", zap.Error(err))
+		}
+	}()
+
 	// Контекст завершения по сигналу
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -133,6 +158,11 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Ошибка при завершении сервера", zap.Error(err))
+	}
+
+	if grpcServer != nil {
+		logger.Info("Завершаем gRPC сервер...")
+		grpcServer.GracefulStop()
 	}
 
 	// Сохраняем данные из хранилища

@@ -7,6 +7,26 @@ option go_package = ".";
 service ShortenerService {
   rpc Shorten(ShortenRequest) returns (ShortenResponse);
   rpc Resolve(ResolveRequest) returns (ResolveResponse);
+  rpc BatchShorten(BatchShortenRequest) returns (BatchShortenResponse);
+}
+
+message BatchShortenRequest {
+  string user_id = 1;
+  repeated BatchURLItem urls = 2;
+}
+
+message BatchURLItem {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message BatchShortenResponse {
+  repeated BatchShortenResult items = 1;
+}
+
+message BatchShortenResult {
+  string correlation_id = 1;
+  string short_url = 2;
 }
 
 message ShortenRequest {
