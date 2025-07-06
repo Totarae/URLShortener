@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Totarae/URLShortener/internal/model"
 	"github.com/Totarae/URLShortener/internal/util"
+	"go.uber.org/zap"
 	"net/url"
 	"time"
 
@@ -108,4 +109,60 @@ func (s *GRPCServer) BatchShorten(ctx context.Context, req *pb.BatchShortenReque
 	}
 
 	return &pb.BatchShortenResponse{Items: results}, nil
+}
+
+func (s *GRPCServer) GetUserURLs(ctx context.Context, req *pb.GetUserURLsRequest) (*pb.GetUserURLsResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	h := s.Handler
+	var result []*pb.GetUserURLsResponseItem
+
+	switch h.Mode {
+	case "database":
+		urlObjs, err := h.Repo.GetURLsByUserID(ctx, req.UserId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch URLs: %v", err)
+		}
+
+		for _, u := range urlObjs {
+			if u.IsDeleted {
+				continue
+			}
+			result = append(result, &pb.GetUserURLsResponseItem{
+				ShortUrl:    u.Shorten,
+				OriginalUrl: u.Origin,
+			})
+		}
+	default:
+
+		return nil, status.Error(codes.Unimplemented, "file mode not supported for this method")
+	}
+
+	return &pb.GetUserURLsResponse{Urls: result}, nil
+}
+
+func (s *GRPCServer) DeleteUserURLs(ctx context.Context, req *pb.DeleteUserURLsRequest) (*pb.DeleteUserURLsResponse, error) {
+	if req.UserId == "" || len(req.ShortUrls) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id and short_urls are required")
+	}
+
+	const batchSize = 100
+	go func(ids []string, userID string) {
+		ctx := context.Background()
+		for i := 0; i < len(ids); i += batchSize {
+			end := i + batchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			batch := ids[i:end]
+
+			if err := s.Handler.Repo.MarkURLsAsDeleted(ctx, batch, userID); err != nil {
+				s.Handler.Logger.Error("Не щмогла", zap.Error(err))
+			}
+		}
+	}(req.ShortUrls, req.UserId)
+
+	return &pb.DeleteUserURLsResponse{Status: "accepted"}, nil
 }
