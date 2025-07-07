@@ -156,12 +156,9 @@ func (h *Handler) BatchShortenHandler(res http.ResponseWriter, req *http.Request
 	userID := h.Auth.GetOrSetUserID(res, req)
 	items := make([]model.BatchItem, 0, len(batchReq))
 	for _, r := range batchReq {
-		items = append(items, model.BatchItem{
-			CorrelationID: r.CorrelationID,
-			OriginalURL:   r.OriginalURL,
-		})
+		items = append(items, model.BatchItem(r))
 	}
-
+	
 	results, err := h.Service.CreateBatchShortURLs(req.Context(), userID, items)
 	if err != nil {
 		h.Logger.Error("Batch shorten error", zap.Error(err))
