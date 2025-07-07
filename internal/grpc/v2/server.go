@@ -42,14 +42,14 @@ func (s *GRPCServer) Resolve(ctx context.Context, req *pb.ResolveRequest) (*pb.R
 		return nil, status.Error(codes.InvalidArgument, "short_url is required")
 	}
 
-	original, err := s.Service.ResolveURL(ctx, req.ShortUrl)
+	urlObj, err := s.Service.ResolveURL(ctx, req.ShortUrl)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "resolve failed: %v", err)
 	}
-	if original == "" {
+	if urlObj == nil || urlObj.IsDeleted {
 		return nil, status.Error(codes.NotFound, "not found")
 	}
-	return &pb.ResolveResponse{OriginalUrl: original}, nil
+	return &pb.ResolveResponse{OriginalUrl: urlObj.Origin}, nil
 }
 
 func (s *GRPCServer) BatchShorten(ctx context.Context, req *pb.BatchShortenRequest) (*pb.BatchShortenResponse, error) {

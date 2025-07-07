@@ -113,7 +113,7 @@ func main() {
 			logger.Fatal("Ошибка запуска gRPC сервера", zap.Error(err))
 		}
 		grpcServer = grpc.NewServer()
-		pb.RegisterShortenerServiceServer(grpcServer, v2.NewGRPCServer(handler))
+		pb.RegisterShortenerServiceServer(grpcServer, v2.NewGRPCServer(svc))
 		reflection.Register(grpcServer) // достучатсья из курла
 
 		logger.Info("gRPC сервер запущен", zap.String("address", grpcAddr))
