@@ -19,7 +19,8 @@ func TestURLStore_SaveAndGet(t *testing.T) {
 	original := "https://yandex.ru"
 	short := util.GenerateShortURL(original)
 
-	store.Save(short, original)
+	userID := "test-user"
+	store.Save(short, original, userID)
 
 	got, ok := store.Get(short)
 	assert.True(t, ok)
