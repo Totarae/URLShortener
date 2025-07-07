@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Totarae/URLShortener/internal/model"
+	"github.com/Totarae/URLShortener/internal/service"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,6 +35,9 @@ func (m *mockRepo) MarkURLsAsDeleted(ctx context.Context, ids []string, userID s
 func (m *mockRepo) Ping(ctx context.Context) error              { return nil }
 func (m *mockRepo) CountURLs(ctx context.Context) (int, error)  { return 0, nil }
 func (m *mockRepo) CountUsers(ctx context.Context) (int, error) { return 0, nil }
+func (m *mockRepo) GetStats(ctx context.Context) (urlCount int, userCount int, err error) {
+	return 0, 0, nil
+}
 
 // ExampleHandler_ReceiveShorten демонстрирует работу метода ReceiveShorten.
 func ExampleHandler_ReceiveShorten() {
@@ -42,7 +46,11 @@ func ExampleHandler_ReceiveShorten() {
 	repo := &mockRepo{}
 	authService := auth.New("example-secret")
 
-	h := NewHandler(store, "http://localhost", repo, logger, "memory", authService, nil)
+	// создаём сервис
+	svc := service.NewShortenerService(repo, store, logger, "memory", "http://localhost")
+
+	// передаём сервис в хендлер
+	h := NewHandler(svc, logger, authService, nil)
 
 	body := `{"url":"https://yandex.ru"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(body))

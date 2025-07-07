@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"context"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/service"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -52,6 +53,9 @@ func (m *mockRepo) MarkURLsAsDeleted(ctx context.Context, ids []string, userID s
 func (m *mockRepo) Ping(ctx context.Context) error {
 	return nil
 }
+func (m *mockRepo) GetStats(ctx context.Context) (int, int, error) {
+	return 42, 7, nil
+}
 
 func setupTestHandler() *handlers.Handler {
 	tmpFile := filepath.Join(os.TempDir(), "bench_data.json")
@@ -61,7 +65,11 @@ func setupTestHandler() *handlers.Handler {
 	logger, _ := zap.NewDevelopment()
 	authService := auth.New("bench-secret")
 
-	return handlers.NewHandler(store, "http://localhost:8080", repo, logger, "file", authService, nil)
+	// создаём сервис с правильным порядком аргументов
+	svc := service.NewShortenerService(repo, store, logger, "file", "http://localhost:8080")
+
+	// передаём сервис в хендлер
+	return handlers.NewHandler(svc, logger, authService, nil)
 }
 
 func BenchmarkReceiveShorten(b *testing.B) {

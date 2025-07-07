@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pb "github.com/Totarae/URLShortener/cmd/proto_gen"
 	v2 "github.com/Totarae/URLShortener/internal/grpc/v2"
+	pb "github.com/Totarae/URLShortener/internal/pkg/proto_gen"
+	"github.com/Totarae/URLShortener/internal/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
@@ -89,7 +90,9 @@ func main() {
 	}
 
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode, authService, trustedNet)
+	// создаем сервис и хендлер
+	svc := service.NewShortenerService(repo, store, logger, cfg.Mode, cfg.BaseURL)
+	handler := handlers.NewHandler(svc, logger, authService, trustedNet)
 
 	r := router.NewRouter(handler, logger)
 

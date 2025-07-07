@@ -13,6 +13,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/timakin/bodyclose v0.0.0-20241222091800-1db5c5ca4d67
+	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/tools v0.33.0
 	google.golang.org/grpc v1.73.0

@@ -22,11 +22,24 @@ type URLRepositoryInterface interface {
 	MarkURLsAsDeleted(ctx context.Context, ids []string, userID string) error
 	CountURLs(ctx context.Context) (int, error)
 	CountUsers(ctx context.Context) (int, error)
+	GetStats(ctx context.Context) (urlCount int, userCount int, err error)
 }
 
 // URLRepository реализует URLRepositoryInterface с использованием PostgreSQL.
 type URLRepository struct {
 	DB database.DBInterface
+}
+
+func (r *URLRepository) GetStats(ctx context.Context) (urlCount int, userCount int, err error) {
+	urls, err := r.CountURLs(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	users, err := r.CountUsers(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return urls, users, nil
 }
 
 // NewURLRepository создаёт новый экземпляр URLRepository.
@@ -88,9 +101,9 @@ func (r *URLRepository) SaveBatchURLs(ctx context.Context, urlObjs []*model.URLO
 	}
 	defer tx.Rollback(ctx)
 
-	query := `INSERT INTO urls (origin, shorten, created) VALUES ($1, $2, $3) RETURNING id`
+	query := `INSERT INTO urls (origin, shorten, created, user_id) VALUES ($1, $2, $3, $4) RETURNING id`
 	for _, obj := range urlObjs {
-		err := tx.QueryRow(ctx, query, obj.Origin, obj.Shorten, obj.Created).Scan(&obj.ID)
+		err := tx.QueryRow(ctx, query, obj.Origin, obj.Shorten, obj.Created, obj.UserID).Scan(&obj.ID)
 		if err != nil {
 			return fmt.Errorf("failed to insert batch URLs: %w", err)
 		}
