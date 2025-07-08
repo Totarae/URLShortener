@@ -21,6 +21,8 @@ type Config struct {
 	TLSCertPath      string `json:"tls_cert_path"`
 	TLSKeyPath       string `json:"tls_key_path"`
 	Mode             string `json:"-"`
+	TrustedSubnet    string `json:"trusted_subnet"`
+	GRPCAddress      string `json:"grpc_address"`
 }
 
 // NewConfig инициализирует конфигурацию на основе аргументов командной строки
@@ -34,6 +36,8 @@ func NewConfig() *Config {
 	viper.SetDefault("ENABLE_HTTPS", false)
 	viper.SetDefault("TLS_CERT_PATH", "cert.pem")
 	viper.SetDefault("TLS_KEY_PATH", "key.pem")
+	viper.SetDefault("TRUSTED_SUBNET", "")
+	viper.SetDefault("GRPC_ADDRESS", ":3200")
 
 	viper.AutomaticEnv()
 
@@ -50,6 +54,8 @@ func NewConfig() *Config {
 	tlsCertPath := flag.String("cert", "", "path to TLS certificate")
 	tlsKeyPath := flag.String("key", "", "path to TLS key")
 	configPath := flag.String("c", "", "path to JSON config file")
+	trustedSubnet := flag.String("t", "", "trusted subnet in CIDR format")
+	grpcAddress := flag.String("grpc", "", "gRPC server address (default :3200)")
 	flag.StringVar(configPath, "config", "", "path to JSON config file")
 
 	flag.Parse()
@@ -80,6 +86,8 @@ func NewConfig() *Config {
 		EnableHTTPS:      viper.GetBool("ENABLE_HTTPS"),
 		TLSCertPath:      viper.GetString("TLS_CERT_PATH"),
 		TLSKeyPath:       viper.GetString("TLS_KEY_PATH"),
+		TrustedSubnet:    viper.GetString("TRUSTED_SUBNET"),
+		GRPCAddress:      viper.GetString("GRPC_ADDRESS"),
 	}
 
 	// Переопределяем значениями из переменных окружения (viper)
@@ -95,6 +103,8 @@ func NewConfig() *Config {
 	override("PG_MIGRATIONS_PATH", &cfg.PgMigrationsPath)
 	override("TLS_CERT_PATH", &cfg.TLSCertPath)
 	override("TLS_KEY_PATH", &cfg.TLSKeyPath)
+	override("TRUSTED_SUBNET", &cfg.TrustedSubnet)
+	override("GRPC_ADDRESS", &cfg.GRPCAddress)
 	cfg.EnableHTTPS = viper.GetBool("ENABLE_HTTPS")
 
 	// Если флаг передан, но переменной окружения нет — используем флаг
@@ -110,6 +120,14 @@ func NewConfig() *Config {
 	if *databaseDSN != "" {
 		cfg.DatabaseDSN = *databaseDSN
 		os.Setenv("DATABASE_DSN", cfg.DatabaseDSN)
+	}
+
+	if *trustedSubnet != "" {
+		cfg.TrustedSubnet = *trustedSubnet
+	}
+
+	if *grpcAddress != "" {
+		cfg.GRPCAddress = *grpcAddress
 	}
 
 	// Определяем режим работы

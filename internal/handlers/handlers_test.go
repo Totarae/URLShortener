@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/Totarae/URLShortener/internal/service"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,10 @@ func setupMockHandler(t *testing.T, mockURL *mocks.MockURLRepositoryInterface, m
 
 	authService := auth.New("test-secret") // используем простой секрет для теста
 
-	return NewHandler(mockStore, baseURL, mockURL, logger, mode, authService)
+	// Создаём сервис с моками
+	svc := service.NewShortenerService(mockURL, mockStore, logger, mode, baseURL)
+
+	return NewHandler(svc, logger, authService, nil)
 }
 
 func TestReceiveURL(t *testing.T) {

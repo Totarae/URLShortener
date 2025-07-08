@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	v2 "github.com/Totarae/URLShortener/internal/grpc/v2"
+	pb "github.com/Totarae/URLShortener/internal/pkg/proto_gen"
+	"github.com/Totarae/URLShortener/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,8 +80,19 @@ func main() {
 
 	authService := auth.New("rainbow-secret-key") // секрет должен быть из .env или конфигурации
 
+	var trustedNet *net.IPNet
+	if cfg.TrustedSubnet != "" {
+		_, parsedNet, err := net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			logger.Fatal("Неверный формат trusted_subnet", zap.String("subnet", cfg.TrustedSubnet), zap.Error(err))
+		}
+		trustedNet = parsedNet
+	}
+
 	// Передача базового URL в обработчики
-	handler := handlers.NewHandler(store, cfg.BaseURL, repo, logger, cfg.Mode, authService)
+	// создаем сервис и хендлер
+	svc := service.NewShortenerService(repo, store, logger, cfg.Mode, cfg.BaseURL)
+	handler := handlers.NewHandler(svc, logger, authService, trustedNet)
 
 	r := router.NewRouter(handler, logger)
 
@@ -83,6 +100,27 @@ func main() {
 		Addr:    cfg.ServerAddress,
 		Handler: r,
 	}
+
+	// gRPC
+	var grpcServer *grpc.Server
+	go func() {
+		grpcAddr := cfg.GRPCAddress
+		if grpcAddr == "" {
+			grpcAddr = ":3200"
+		}
+		lis, err := net.Listen("tcp", grpcAddr)
+		if err != nil {
+			logger.Fatal("Ошибка запуска gRPC сервера", zap.Error(err))
+		}
+		grpcServer = grpc.NewServer()
+		pb.RegisterShortenerServiceServer(grpcServer, v2.NewGRPCServer(svc))
+		reflection.Register(grpcServer) // достучатсья из курла
+
+		logger.Info("gRPC сервер запущен", zap.String("address", grpcAddr))
+		if err := grpcServer.Serve(lis); err != nil {
+			logger.Fatal("Ошибка работы gRPC", zap.Error(err))
+		}
+	}()
 
 	// Контекст завершения по сигналу
 	ctx, stop := signal.NotifyContext(context.Background(),
@@ -123,6 +161,11 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Ошибка при завершении сервера", zap.Error(err))
+	}
+
+	if grpcServer != nil {
+		logger.Info("Завершаем gRPC сервер...")
+		grpcServer.GracefulStop()
 	}
 
 	// Сохраняем данные из хранилища

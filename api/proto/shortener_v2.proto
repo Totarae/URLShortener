@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package shortener.v2;
+
+option go_package = ".";
+
+service ShortenerService {
+  rpc Shorten(ShortenRequest) returns (ShortenResponse);
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+  rpc BatchShorten(BatchShortenRequest) returns (BatchShortenResponse);
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+  rpc DeleteUserURLs(DeleteUserURLsRequest) returns (DeleteUserURLsResponse);
+}
+
+message BatchShortenRequest {
+  string user_id = 1;
+  repeated BatchURLItem urls = 2;
+}
+
+message BatchURLItem {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message BatchShortenResponse {
+  repeated BatchShortenResult items = 1;
+}
+
+message BatchShortenResult {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+message ShortenRequest {
+  string user_id = 1;
+  string url = 2;
+}
+
+message ShortenResponse {
+  string short_url = 1;
+}
+
+message ResolveRequest {
+  string short_url = 1;
+}
+
+message ResolveResponse {
+  string original_url = 1;
+}
+message GetUserURLsRequest {
+  string user_id = 1;
+}
+
+message GetUserURLsResponseItem {
+  string original_url = 1;
+  string short_url = 2;
+}
+
+message GetUserURLsResponse {
+  repeated GetUserURLsResponseItem urls = 1;
+}
+
+message DeleteUserURLsRequest {
+  string user_id = 1;
+  repeated string short_urls = 2;
+}
+
+message DeleteUserURLsResponse {
+  string status = 1;
+}
